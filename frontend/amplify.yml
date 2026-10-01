@@ -1,0 +1,26 @@
+# AWS Amplify Hosting build for the Next.js app (SSR).
+# The repository is a monorepo: set AMPLIFY_MONOREPO_APP_ROOT=frontend.
+version: 1
+applications:
+  - appRoot: frontend
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - if [ -f package-lock.json ]; then npm ci; else npm install; fi
+        build:
+          commands:
+            # Amplify gives the Next.js server its environment variables at
+            # runtime only through .env.production. Copy just this app's
+            # variables (never COGNITO_CLIENT_SECRET: in AWS the secret is
+            # read from Secrets Manager via COGNITO_CLIENT_SECRET_ARN).
+            - env | grep -E '^(CLEAN_AM_[A-Z_]+|COGNITO_(REGION|USER_POOL_ID|CLIENT_ID|CLIENT_SECRET_ARN|DOMAIN)|GOOGLE_SIGN_IN)=' >> .env.production || true
+            - npm run build
+      artifacts:
+        baseDirectory: .next
+        files:
+          - '**/*'
+      cache:
+        paths:
+          - .next/cache/**/*
+          - node_modules/**/*

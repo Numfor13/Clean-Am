@@ -1,0 +1,89 @@
+/* CLEAN-AM design tokens, from the Design System artifact (tokens.json).
+   Every colour was sampled from the approved landing page comp. */
+
+:root {
+  color-scheme: light;
+
+  /* Ground */
+  --surface-page: #f7f7f3;
+  --surface-card: #ffffff;
+  --surface-sunken: #edefe8;
+  /* Identity bands */
+  --surface-deep: #06180d;
+  --surface-deep-raised: #103020;
+  --surface-header: #082515;
+
+  --ink-strong: #06180d;
+  --ink: #1d3328;
+  --ink-muted: #5b6f63;
+  --ink-on-deep: #ffffff;
+  --ink-on-deep-muted: #b9cdc1;
+
+  /* Action. brand is FILL ONLY: 1.4:1 on white. Use brand-text for green words. */
+  --brand: #48f596;
+  --brand-hover: #3fee94;
+  --brand-ink: #06180d;
+  --brand-text: #0a6b3b;
+  --brand-soft: #e2f8ec;
+  --brand-deep: #0d4d2c;
+
+  --border: #e3e7de;
+  --border-strong: #c8d1c5;
+  --border-control: #7d8a80;
+  --focus-ring: #0a6b3b;
+
+  /* Signal: report state and nothing else */
+  --pending-bg: #fef3e0;
+  --pending-ink: #945a00;
+  --pending-dot: #d98a12;
+  --progress-bg: #e6effd;
+  --progress-ink: #1257c4;
+  --progress-dot: #2e7cf6;
+  --done-bg: #e2f8ec;
+  --done-ink: #0a6b3b;
+  --done-dot: #0f6a38;
+  --flagged-bg: #fdeceb;
+  --flagged-ink: #b42318;
+  --flagged-dot: #d92d20;
+  --danger: #d92d20;
+  --danger-hover: #b42318;
+
+  --amber: #f9b347;
+  --amber-ink: #945a00;
+  --amber-soft: #fef3e0;
+  --amber-border: #f5c874;
+
+  /* Type */
+  --font-display: var(--font-outfit), "Outfit", "Segoe UI", system-ui, sans-serif;
+  --font-text: var(--font-public-sans), "Public Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, "Cascadia Mono", monospace;
+
+  /* Space: 4px grid */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 24px;
+  --s8: 32px;
+  --s10: 40px;
+  --s12: 48px;
+  --s16: 64px;
+  --s20: 80px;
+
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 24px;
+  --r-pill: 999px;
+
+  --shadow-card: 0 1px 2px rgba(6, 24, 13, 0.06), 0 8px 24px rgba(6, 24, 13, 0.08);
+  --shadow-raised: 0 4px 12px rgba(6, 24, 13, 0.1);
+  --shadow-overlay: 0 20px 48px rgba(6, 24, 13, 0.18);
+
+  --topbar-h: 60px;
+  --tabbar-h: 68px;
+  --mobile-max: 480px;
+  --content-max: 1200px;
+}
