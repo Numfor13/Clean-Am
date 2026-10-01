@@ -4,7 +4,7 @@ Serverless backend for CLEAN-AM, written with the AWS CDK in Python.
 
 ```
 backend/
-  app.py              CDK entry point: creates the two stacks
+   app.py              CDK entry point: creates the two stacks
   cdk.json            tells the CDK to run app.py
   requirements.txt    aws-cdk-lib, constructs
   stacks/
@@ -89,7 +89,7 @@ python -m venv venv
 venv\Scripts\activate          # Windows (source venv/bin/activate elsewhere)
 pip install -r requirements.txt
 cdk bootstrap                  # once per account and region
-cdk deploy --all -c seedAdminEmail=you@example.com -c sesSenderEmail=you@example.com
+cdk deploy --all -c seedAdminEmail=numforprecious7@gmail.com -c sesSenderEmail=numforprecious7@gmail.com
 ```
 
 Options (`-c name=value`): `stage` (default `dev`), `frontendUrl` (default
