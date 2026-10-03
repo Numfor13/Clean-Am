@@ -10,6 +10,9 @@ import { safeNext } from "@/lib/jwt";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  // Google sign-in commented out: authentication is purely phone-number based
+  return NextResponse.redirect(new URL("/login", request.url));
+  /*
   const store = await cookies();
   const next = safeNext(request.nextUrl.searchParams.get("next"), "") || undefined;
 
@@ -26,4 +29,5 @@ export async function GET(request: NextRequest) {
     maxAge: 600,
   });
   return NextResponse.redirect(authorizeUrl(request.nextUrl.origin, state, challenge));
+  */
 }

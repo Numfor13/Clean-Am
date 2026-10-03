@@ -134,7 +134,7 @@ export async function getSession(): Promise<Session> {
     role: signedIn ? roleFromClaims(claims) : null,
     username: signedIn ? usernameFromClaims(claims) : null,
     guestLabel: guestLabelFromToken(store.get(COOKIE.guest)?.value),
-    google: config.googleSignIn && Boolean(config.cognito.domain),
+    google: false, // Google auth disabled: purely phone-number based auth
   };
 }
 

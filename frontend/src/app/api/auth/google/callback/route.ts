@@ -10,6 +10,9 @@ import { homeFor, safeNext } from "@/lib/jwt";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  // Google sign-in commented out: authentication is purely phone-number based
+  return NextResponse.redirect(new URL("/login", request.url));
+  /*
   const store = await cookies();
   const params = request.nextUrl.searchParams;
   const back = (path: string) => NextResponse.redirect(new URL(path, request.url));
@@ -37,4 +40,5 @@ export async function GET(request: NextRequest) {
     console.error("Google sign-in failed", error);
     return back("/login?error=google");
   }
+  */
 }

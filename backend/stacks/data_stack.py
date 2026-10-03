@@ -149,18 +149,19 @@ class DataStack(Stack):
         # --- Google sign-in (optional, on Citizen pool): -c googleClientId=... --------
         providers = [cognito.UserPoolClientIdentityProvider.COGNITO]
         google = None
-        if self.node.try_get_context("googleClientId"):
-            if not self.node.try_get_context("googleSecretArn"):
-                raise ValueError("Google sign-in needs -c googleSecretArn=<ARN of the Google client secret>")
-            google_secret = secretsmanager.Secret.from_secret_complete_arn(
-                self, "GoogleSecret", self.node.try_get_context("googleSecretArn"))
-            google = cognito.UserPoolIdentityProviderGoogle(
-                self, "Google", user_pool=self.citizen_user_pool, client_id=self.node.try_get_context("googleClientId"),
-                client_secret_value=google_secret.secret_value_from_json("client_secret"),
-                scopes=["openid", "email", "profile"],
-                attribute_mapping=cognito.AttributeMapping(
-                    email=cognito.ProviderAttribute.GOOGLE_EMAIL, fullname=cognito.ProviderAttribute.GOOGLE_NAME))
-            providers.append(cognito.UserPoolClientIdentityProvider.GOOGLE)
+        # Google sign-in commented out (authentication is phone-number based)
+        # if self.node.try_get_context("googleClientId"):
+        #     if not self.node.try_get_context("googleSecretArn"):
+        #         raise ValueError("Google sign-in needs -c googleSecretArn=<ARN of the Google client secret>")
+        #     google_secret = secretsmanager.Secret.from_secret_complete_arn(
+        #         self, "GoogleSecret", self.node.try_get_context("googleSecretArn"))
+        #     google = cognito.UserPoolIdentityProviderGoogle(
+        #         self, "Google", user_pool=self.citizen_user_pool, client_id=self.node.try_get_context("googleClientId"),
+        #         client_secret_value=google_secret.secret_value_from_json("client_secret"),
+        #         scopes=["openid", "email", "profile"],
+        #         attribute_mapping=cognito.AttributeMapping(
+        #             email=cognito.ProviderAttribute.GOOGLE_EMAIL, fullname=cognito.ProviderAttribute.GOOGLE_NAME))
+        #     providers.append(cognito.UserPoolClientIdentityProvider.GOOGLE)
 
         # Google sign-in goes through Cognito's OAuth endpoints on this domain.
         account = "local" if cdk.Token.is_unresolved(self.account) else self.account[-6:]

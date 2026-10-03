@@ -56,6 +56,8 @@ function redirectFor(error: unknown): string | null {
 
 /** "Continue with Google": a plain link, the server does the OAuth round trip. */
 function GoogleButton({ next }: { next?: string }) {
+  // Google authentication commented out: authentication is purely phone-number based.
+  /*
   const session = useSession();
   const { t } = useT();
   if (!session.google) return null;
@@ -66,6 +68,8 @@ function GoogleButton({ next }: { next?: string }) {
       {t("login.google")}
     </a>
   );
+  */
+  return null;
 }
 
 // ===========================================================================
@@ -403,12 +407,14 @@ export function RegisterScreen({ next }: { next?: string }) {
             {busy ? <span className="spinner" aria-hidden="true" /> : null}
             {t("register.submit")}
           </button>
+          {/* Google authentication commented out:
           {session.google ? (
             <>
               <div className="or-divider">{t("common.or")}</div>
               <GoogleButton next={next} />
             </>
           ) : null}
+          */}
           <p className="center" style={{ fontSize: 17 }}>
             {t("register.haveAccount")}{" "}
             <Link href="/login" className="link">
