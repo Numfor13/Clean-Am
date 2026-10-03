@@ -27,9 +27,19 @@ export function middleware(request: NextRequest) {
 
   const redirect = (to: string) => NextResponse.redirect(new URL(to, request.url));
 
+  // Staff login screen must be directly accessible to unauthenticated users.
+  if (matches(pathname, "/staff/login")) {
+    if (role && (role === "Employee" || role === "Admin")) return redirect(homeFor(role));
+    return NextResponse.next();
+  }
+
   const area = AREAS.find((a) => matches(pathname, a.prefix));
   if (area) {
-    if (!role) return redirect(`/login?next=${encodeURIComponent(pathname + search)}`);
+    if (!role) {
+      const isStaffArea = area.prefix === "/staff" || area.prefix === "/admin";
+      const loginPath = isStaffArea ? "/staff/login" : "/login";
+      return redirect(`${loginPath}?next=${encodeURIComponent(pathname + search)}`);
+    }
     if (!area.roles.includes(role)) return redirect(homeFor(role));
     return NextResponse.next();
   }

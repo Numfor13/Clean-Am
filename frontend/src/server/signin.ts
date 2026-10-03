@@ -3,6 +3,7 @@
 import type { cookies } from "next/headers";
 import { callBackend } from "./backend";
 import { COOKIE, writeTokens, type Tokens } from "./session";
+import type { PoolType } from "./config";
 import { roleFromClaims } from "@/lib/jwt";
 import type { Role } from "@/lib/types";
 
@@ -13,8 +14,8 @@ type CookieStore = Awaited<ReturnType<typeof cookies>>;
  * the account (FR-AUTH-03, revised). Claiming is best effort: sign-in never
  * fails because of it, and it is retried at the next sign-in.
  */
-export async function completeSignIn(store: CookieStore, tokens: Tokens): Promise<Role | null> {
-  const role = roleFromClaims(writeTokens(store, tokens));
+export async function completeSignIn(store: CookieStore, tokens: Tokens, pool?: PoolType): Promise<Role | null> {
+  const role = roleFromClaims(writeTokens(store, tokens, pool));
   store.delete(COOKIE.pending);
 
   const guestToken = store.get(COOKIE.guest)?.value;

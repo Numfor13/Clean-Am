@@ -9,7 +9,7 @@
 // (AllowedFirstAuthFactors: password and SMS one-time code).
 
 import { createHmac } from "node:crypto";
-import { clientSecret, config } from "./config";
+import { clientSecret, config, poolConfig, type PoolType } from "./config";
 import { AuthError, type AuthErrorCode, type AuthProvider, type AuthStep, type SignUpInput } from "./auth-provider";
 import type { Tokens } from "./session";
 
@@ -36,14 +36,14 @@ class CognitoApiError extends Error {
   }
 }
 
-function endpoint(): string {
-  return `https://cognito-idp.${config.cognito.region}.amazonaws.com/`;
+function endpoint(region?: string): string {
+  return `https://cognito-idp.${region || config.cognito.region}.amazonaws.com/`;
 }
 
-async function call<T>(action: string, body: Record<string, unknown>): Promise<T> {
+async function call<T>(action: string, body: Record<string, unknown>, region?: string): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(endpoint(), {
+    response = await fetch(endpoint(region), {
       method: "POST",
       headers: {
         "Content-Type": "application/x-amz-json-1.1",
@@ -64,9 +64,11 @@ async function call<T>(action: string, body: Record<string, unknown>): Promise<T
   return payload as T;
 }
 
-async function secretHash(username: string): Promise<string> {
-  return createHmac("sha256", await clientSecret())
-    .update(username + config.cognito.clientId)
+async function secretHash(username: string, pool: PoolType = "citizen"): Promise<string> {
+  const poolClient = poolConfig(pool);
+  const sec = await clientSecret(pool);
+  return createHmac("sha256", sec)
+    .update(username + poolClient.clientId)
     .digest("base64");
 }
 
@@ -151,18 +153,20 @@ async function respond(
   username: string,
   session: string,
   answers: Record<string, string>,
+  pool: PoolType = "citizen",
 ): Promise<CognitoAuthResponse> {
+  const poolClient = poolConfig(pool);
   return call<CognitoAuthResponse>("RespondToAuthChallenge", {
-    ClientId: config.cognito.clientId,
+    ClientId: poolClient.clientId,
     ChallengeName: challenge,
     Session: session,
-    ChallengeResponses: { USERNAME: username, SECRET_HASH: await secretHash(username), ...answers },
-  });
+    ChallengeResponses: { USERNAME: username, SECRET_HASH: await secretHash(username, pool), ...answers },
+  }, poolClient.region);
 }
 
-function toStep(response: CognitoAuthResponse, username: string): AuthStep {
+function toStep(response: CognitoAuthResponse, username: string, pool: PoolType = "citizen"): AuthStep {
   if (response.AuthenticationResult) {
-    return { kind: "tokens", tokens: tokensFrom(response.AuthenticationResult) };
+    return { kind: "tokens", tokens: tokensFrom(response.AuthenticationResult), pool };
   }
   const name = response.ChallengeName;
   if ((name === "SMS_OTP" || name === "SMS_MFA" || name === "NEW_PASSWORD_REQUIRED" || name === "SOFTWARE_TOKEN_MFA") && response.Session) {
@@ -172,67 +176,125 @@ function toStep(response: CognitoAuthResponse, username: string): AuthStep {
       session: response.Session,
       username: challengeUser(response, username),
       destination: response.ChallengeParameters?.CODE_DELIVERY_DESTINATION,
+      pool,
     };
   }
   // Anything else (MFA setup, etc.) is not something this app offers.
   throw new AuthError("SERVICE_ERROR", `Unsupported sign-in step: ${name ?? "none"}`, 502);
 }
 
-async function startUserAuth(username: string, preferred: "PASSWORD" | "SMS_OTP", password?: string) {
+async function startUserAuth(username: string, preferred: "PASSWORD" | "SMS_OTP", password?: string, pool: PoolType = "citizen") {
+  const poolClient = poolConfig(pool);
   const params: Record<string, string> = {
     USERNAME: username,
-    SECRET_HASH: await secretHash(username),
+    SECRET_HASH: await secretHash(username, pool),
     PREFERRED_CHALLENGE: preferred,
   };
   if (password) params.PASSWORD = password;
 
   let response = await call<CognitoAuthResponse>("InitiateAuth", {
     AuthFlow: "USER_AUTH",
-    ClientId: config.cognito.clientId,
+    ClientId: poolClient.clientId,
     AuthParameters: params,
-  });
+  }, poolClient.region);
 
-  // If Cognito asks which factor to use instead of taking the preference,
-  // answer it.
+  // If Cognito asks which factor to use instead of taking the preference, answer it.
   if (response.ChallengeName === "SELECT_CHALLENGE" && response.Session) {
     const user = challengeUser(response, username);
     response = await respond("SELECT_CHALLENGE", user, response.Session, {
       ANSWER: preferred,
       ...(password ? { PASSWORD: password } : {}),
-    });
+    }, pool);
   }
-  return toStep(response, username);
+  return toStep(response, username, pool);
+}
+
+async function startPasswordAuth(username: string, password: string, pool: PoolType): Promise<AuthStep> {
+  const poolClient = poolConfig(pool);
+  if (!poolClient.clientId) {
+    throw new AuthError("WRONG_CREDENTIALS", "Invalid credentials", 401);
+  }
+  const hash = await secretHash(username, pool);
+  let response: CognitoAuthResponse;
+  try {
+    response = await call<CognitoAuthResponse>("InitiateAuth", {
+      AuthFlow: "USER_PASSWORD_AUTH",
+      ClientId: poolClient.clientId,
+      AuthParameters: {
+        USERNAME: username,
+        PASSWORD: password,
+        SECRET_HASH: hash,
+      },
+    }, poolClient.region);
+  } catch (err) {
+    // If USER_PASSWORD_AUTH flow is not supported, attempt USER_AUTH with PASSWORD
+    if (err instanceof AuthError && (err.code === "SERVICE_ERROR" || err.message.toLowerCase().includes("flow"))) {
+      return startUserAuth(username, "PASSWORD", password, pool);
+    }
+    throw err;
+  }
+  return toStep(response, username, pool);
 }
 
 export const cognitoProvider: AuthProvider = {
-  signInWithPassword(identifier, password) {
-    return startUserAuth(identifier, "PASSWORD", password);
+  signInWithPassword(identifier, password, pool = "citizen") {
+    return startUserAuth(identifier, "PASSWORD", password, pool);
+  },
+
+  async signInStaff(email: string, password: string): Promise<AuthStep> {
+    const normalized = email.trim().toLowerCase();
+    let employeeErr: unknown = null;
+    if (config.employeePool.clientId || config.employeePool.userPoolId) {
+      try {
+        return await startPasswordAuth(normalized, password, "employee");
+      } catch (err) {
+        employeeErr = err;
+        if (err instanceof AuthError && err.code === "ACCOUNT_SUSPENDED") {
+          throw err;
+        }
+      }
+    }
+    if (config.adminPool.clientId || config.adminPool.userPoolId) {
+      try {
+        return await startPasswordAuth(normalized, password, "admin");
+      } catch (err) {
+        if (err instanceof AuthError && err.code === "ACCOUNT_SUSPENDED") {
+          throw err;
+        }
+        if (employeeErr instanceof AuthError && employeeErr.code !== "WRONG_CREDENTIALS") {
+          throw employeeErr;
+        }
+        throw err;
+      }
+    }
+    if (employeeErr) throw employeeErr;
+    return startUserAuth(normalized, "PASSWORD", password, "citizen");
   },
 
   startSmsSignIn(phone) {
-    return startUserAuth(phone, "SMS_OTP");
+    return startUserAuth(phone, "SMS_OTP", undefined, "citizen");
   },
 
-  async answerSmsCode(username, session, code, challenge = "SMS_OTP") {
-    // SMS_OTP is a sign-in by code; SMS_MFA is a code after the password.
+  async answerSmsCode(username, session, code, challenge = "SMS_OTP", pool = "citizen") {
     const answer: Record<string, string> = challenge === "SMS_MFA" ? { SMS_MFA_CODE: code } : { SMS_OTP_CODE: code };
-    return toStep(await respond(challenge, username, session, answer), username);
+    return toStep(await respond(challenge, username, session, answer, pool), username, pool);
   },
 
-  async answerMfaCode(username, session, code) {
-    return toStep(await respond("SOFTWARE_TOKEN_MFA", username, session, { SOFTWARE_TOKEN_MFA_CODE: code }), username);
+  async answerMfaCode(username, session, code, pool = "citizen") {
+    return toStep(await respond("SOFTWARE_TOKEN_MFA", username, session, { SOFTWARE_TOKEN_MFA_CODE: code }, pool), username, pool);
   },
 
-  async answerNewPassword(username, session, newPassword) {
-    return toStep(await respond("NEW_PASSWORD_REQUIRED", username, session, { NEW_PASSWORD: newPassword }), username);
+  async answerNewPassword(username, session, newPassword, pool = "citizen") {
+    return toStep(await respond("NEW_PASSWORD_REQUIRED", username, session, { NEW_PASSWORD: newPassword }, pool), username, pool);
   },
 
-  async refresh(refreshToken, username) {
+  async refresh(refreshToken, username, pool = "citizen") {
+    const poolClient = poolConfig(pool);
     const response = await call<CognitoAuthResponse>("InitiateAuth", {
       AuthFlow: "REFRESH_TOKEN_AUTH",
-      ClientId: config.cognito.clientId,
-      AuthParameters: { REFRESH_TOKEN: refreshToken, SECRET_HASH: await secretHash(username) },
-    });
+      ClientId: poolClient.clientId,
+      AuthParameters: { REFRESH_TOKEN: refreshToken, SECRET_HASH: await secretHash(username, pool) },
+    }, poolClient.region);
     if (!response.AuthenticationResult) throw new AuthError("SESSION_EXPIRED", "Please sign in again.", 401);
     return tokensFrom(response.AuthenticationResult);
   },

@@ -42,11 +42,19 @@ function maskPhone(phone: string): string {
   return `+237 ${phone.slice(4, 5)}•• •• ${phone.slice(-4, -2)} ${phone.slice(-2)}`;
 }
 
+import type { PoolType } from "@/server/config";
+
 /**
  * Tokens in hand: store them, move this browser's guest reports into the
  * account if it is a citizen, and say where to go.
  */
-async function finish(store: CookieStore, step: AuthStep, next: string | undefined, extra: { phone?: string; email?: string }) {
+async function finish(
+  store: CookieStore,
+  step: AuthStep,
+  next: string | undefined,
+  extra: { phone?: string; email?: string; pool?: PoolType }
+) {
+  const pool = step.pool ?? extra.pool;
   if (step.kind === "challenge") {
     writePending(store, {
       kind: step.challenge,
@@ -56,6 +64,7 @@ async function finish(store: CookieStore, step: AuthStep, next: string | undefin
       phone: extra.phone,
       email: extra.email,
       next,
+      pool,
     });
     const to =
       step.challenge === "NEW_PASSWORD_REQUIRED"
@@ -66,7 +75,7 @@ async function finish(store: CookieStore, step: AuthStep, next: string | undefin
     return NextResponse.json({ ok: true, next: to });
   }
 
-  const role = await completeSignIn(store, step.tokens);
+  const role = await completeSignIn(store, step.tokens, pool);
   return NextResponse.json({ ok: true, next: safeNext(next, homeFor(role)) });
 }
 
@@ -77,24 +86,44 @@ async function run(action: string, body: Body, store: CookieStore) {
   switch (action) {
     case "sign-in": {
       const identifier = str(body, "identifier");
-      // Cognito passwords never start or end with a space; drop one copied from an email.
       const password = typeof body.password === "string" ? body.password.trim() : "";
       if (!identifier || !password) return fail("INVALID_INPUT", "Enter your phone number and password.");
-      if (!E164_CM.test(identifier) && !EMAIL.test(identifier)) return fail("INVALID_PHONE", "Enter a valid phone number.");
-      try {
-        const step = await auth.signInWithPassword(identifier, password);
-        return finish(store, step, next, EMAIL.test(identifier) ? { email: identifier } : { phone: identifier });
-      } catch (error) {
-        // An unconfirmed citizen: send a fresh code and pick up at /verify.
-        // A disabled staff account was deactivated by an admin; it is not a
-        // citizen suspended for false reports.
-        if (error instanceof AuthError && error.code === "ACCOUNT_SUSPENDED" && EMAIL.test(identifier)) {
-          return fail("ACCOUNT_DISABLED", "This staff account has been deactivated. Contact your administrator.", 403);
+      if (body.staff === true || EMAIL.test(identifier)) {
+        try {
+          const step = await auth.signInStaff(identifier, password);
+          return finish(store, step, next, { email: identifier, pool: step.pool });
+        } catch (error) {
+          if (error instanceof AuthError && error.code === "ACCOUNT_SUSPENDED") {
+            return fail("ACCOUNT_DISABLED", "This staff account has been deactivated. Contact your administrator.", 403);
+          }
+          throw error;
         }
+      }
+      if (!E164_CM.test(identifier)) return fail("INVALID_PHONE", "Enter a valid phone number.");
+      try {
+        const step = await auth.signInWithPassword(identifier, password, "citizen");
+        return finish(store, step, next, { phone: identifier, pool: "citizen" });
+      } catch (error) {
         if (error instanceof AuthError && error.code === "NOT_CONFIRMED" && E164_CM.test(identifier)) {
           const { destination } = await auth.resendSignUpCode(identifier);
-          writePending(store, { kind: "SIGN_UP", username: identifier, phone: identifier, destination: destination ?? maskPhone(identifier), next });
+          writePending(store, { kind: "SIGN_UP", username: identifier, phone: identifier, destination: destination ?? maskPhone(identifier), next, pool: "citizen" });
           return NextResponse.json({ ok: true, next: "/verify?purpose=signup" });
+        }
+        throw error;
+      }
+    }
+
+    case "staff-sign-in": {
+      const email = str(body, "email").toLowerCase();
+      const password = typeof body.password === "string" ? body.password.trim() : "";
+      if (!email || !password) return fail("INVALID_INPUT", "Enter your staff email and password.");
+      if (!EMAIL.test(email)) return fail("INVALID_EMAIL", "Enter a valid email address.");
+      try {
+        const step = await auth.signInStaff(email, password);
+        return finish(store, step, next, { email, pool: step.pool });
+      } catch (error) {
+        if (error instanceof AuthError && error.code === "ACCOUNT_SUSPENDED") {
+          return fail("ACCOUNT_DISABLED", "This staff account has been deactivated. Contact your administrator.", 403);
         }
         throw error;
       }
@@ -135,11 +164,15 @@ async function run(action: string, body: Body, store: CookieStore) {
       if (code.length !== 6) return fail("WRONG_CODE", "Enter the 6-digit code.");
 
       if (pending.kind === "SOFTWARE_TOKEN_MFA" && pending.session) {
-        return finish(store, await auth.answerMfaCode(pending.username, pending.session, code), pending.next, {});
+        return finish(store, await auth.answerMfaCode(pending.username, pending.session, code, pending.pool), pending.next, {
+          phone: pending.phone,
+          email: pending.email,
+          pool: pending.pool,
+        });
       }
       if ((pending.kind === "SMS_OTP" || pending.kind === "SMS_MFA") && pending.session) {
-        const step = await auth.answerSmsCode(pending.username, pending.session, code, pending.kind);
-        return finish(store, step, pending.next, { phone: pending.phone });
+        const step = await auth.answerSmsCode(pending.username, pending.session, code, pending.kind, pending.pool);
+        return finish(store, step, pending.next, { phone: pending.phone, pool: pending.pool });
       }
       if (pending.kind === "SIGN_UP") {
         const phone = pending.phone ?? pending.username;
@@ -205,7 +238,12 @@ async function run(action: string, body: Body, store: CookieStore) {
       }
       // Cognito passwords never start or end with a space; drop one copied from an email.
       const password = typeof body.password === "string" ? body.password.trim() : "";
-      return finish(store, await auth.answerNewPassword(pending.username, pending.session, password), pending.next, {});
+      return finish(
+        store,
+        await auth.answerNewPassword(pending.username, pending.session, password, pending.pool),
+        pending.next,
+        { email: pending.email, pool: pending.pool }
+      );
     }
 
     case "email-start": {

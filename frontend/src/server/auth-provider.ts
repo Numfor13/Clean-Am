@@ -1,16 +1,18 @@
 // The sign-in operations the route handlers use, implemented against Amazon
 // Cognito in cognito.ts.
 
+import type { PoolType } from "./config";
 import type { Tokens } from "./session";
 
 export type AuthStep =
-  | { kind: "tokens"; tokens: Tokens }
+  | { kind: "tokens"; tokens: Tokens; pool?: PoolType }
   | {
       kind: "challenge";
       challenge: "SMS_OTP" | "SMS_MFA" | "NEW_PASSWORD_REQUIRED" | "SOFTWARE_TOKEN_MFA";
       session: string;
       username: string;
       destination?: string;
+      pool?: PoolType;
     };
 
 export interface SignUpInput {
@@ -22,13 +24,15 @@ export interface SignUpInput {
 }
 
 export interface AuthProvider {
-  signInWithPassword(identifier: string, password: string): Promise<AuthStep>;
+  signInWithPassword(identifier: string, password: string, pool?: PoolType): Promise<AuthStep>;
+  /** Unified staff login trying Employee then Admin user pool. */
+  signInStaff(email: string, password: string): Promise<AuthStep>;
   startSmsSignIn(phone: string): Promise<AuthStep>;
-  answerSmsCode(username: string, session: string, code: string, challenge?: "SMS_OTP" | "SMS_MFA"): Promise<AuthStep>;
-  answerNewPassword(username: string, session: string, newPassword: string): Promise<AuthStep>;
+  answerSmsCode(username: string, session: string, code: string, challenge?: "SMS_OTP" | "SMS_MFA", pool?: PoolType): Promise<AuthStep>;
+  answerNewPassword(username: string, session: string, newPassword: string, pool?: PoolType): Promise<AuthStep>;
   /** The 6-digit code from an authenticator app (staff who turned on two-step verification). */
-  answerMfaCode(username: string, session: string, code: string): Promise<AuthStep>;
-  refresh(refreshToken: string, username: string): Promise<Tokens>;
+  answerMfaCode(username: string, session: string, code: string, pool?: PoolType): Promise<AuthStep>;
+  refresh(refreshToken: string, username: string, pool?: PoolType): Promise<Tokens>;
 
   signUp(input: SignUpInput): Promise<{ session?: string; destination?: string }>;
   confirmSignUp(phone: string, code: string, session?: string): Promise<{ session?: string }>;

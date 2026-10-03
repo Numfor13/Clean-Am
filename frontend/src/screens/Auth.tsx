@@ -74,9 +74,7 @@ function GoogleButton({ next }: { next?: string }) {
 export function LoginScreen({ next, notice }: { next?: string; notice?: "confirmed" | "reset" | "google" | null }) {
   const { t } = useT();
   const [mode, setMode] = useState<"password" | "code">("password");
-  const [staff, setStaff] = useState(false);
   const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [fieldError, setFieldError] = useState<string | null>(null);
@@ -86,9 +84,9 @@ export function LoginScreen({ next, notice }: { next?: string; notice?: "confirm
     e.preventDefault();
     setError(null);
     setFieldError(null);
-    const identifier = staff ? email.trim() : toE164(phone);
-    if (!identifier || (staff && !/^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$/.test(identifier))) {
-      setFieldError(staff ? t("auth.error.INVALID_EMAIL") : t("auth.error.INVALID_PHONE"));
+    const identifier = toE164(phone);
+    if (!identifier) {
+      setFieldError(t("auth.error.INVALID_PHONE"));
       return;
     }
     setBusy(true);
@@ -122,7 +120,7 @@ export function LoginScreen({ next, notice }: { next?: string; notice?: "confirm
               {t("login.title")}
             </h1>
             <p className="body-l" style={{ color: "var(--brand-deep)", fontSize: 21 }}>
-              {staff ? t("login.staffWelcome") : t("login.welcome")}
+              {t("login.welcome")}
             </p>
           </div>
 
@@ -145,26 +143,12 @@ export function LoginScreen({ next, notice }: { next?: string; notice?: "confirm
             </div>
           ) : null}
 
-          {staff ? (
-            <TextField
-              label={t("field.email")}
-              type="email"
-              value={email}
-              onChange={setEmail}
-              autoComplete="username"
-              inputMode="email"
-              placeholder="name@buea-council.cm"
-              error={fieldError}
-              required
-            />
-          ) : (
-            <PhoneInput value={phone} onChange={setPhone} error={fieldError} />
-          )}
+          <PhoneInput value={phone} onChange={setPhone} error={fieldError} />
 
           {mode === "password" ? (
             <div className="stack" style={{ "--gap": "10px" } as React.CSSProperties}>
               <PasswordField label={t("field.password")} value={password} onChange={setPassword} />
-              <Link href={staff ? "/forgot-password?staff=1" : "/forgot-password"} className="link" style={{ alignSelf: "flex-end" }}>
+              <Link href="/forgot-password" className="link" style={{ alignSelf: "flex-end" }}>
                 {t("login.forgot")}
               </Link>
             </div>
@@ -184,44 +168,114 @@ export function LoginScreen({ next, notice }: { next?: string; notice?: "confirm
             {mode === "code" ? t("login.sendCode") : t("login.submit")}
           </button>
 
-          {!staff ? (
-            <>
-              <div className="or-divider">{t("common.or")}</div>
-              <GoogleButton next={next} />
-              <button
-                type="button"
-                className="btn btn--outline btn--block btn--lg"
-                onClick={() => {
-                  setMode((m) => (m === "password" ? "code" : "password"));
-                  setError(null);
-                }}
-              >
-                {mode === "password" ? <MessageDots aria-hidden="true" /> : <Lock aria-hidden="true" />}
-                {mode === "password" ? t("login.useCode") : t("login.usePassword")}
-              </button>
-              <p className="center" style={{ fontSize: 17 }}>
-                {t("login.newHere")}{" "}
-                <Link href="/register" className="link">
-                  {t("login.createAccount")}
-                </Link>
-              </p>
-            </>
+          <div className="or-divider">{t("common.or")}</div>
+          <GoogleButton next={next} />
+          <button
+            type="button"
+            className="btn btn--outline btn--block btn--lg"
+            onClick={() => {
+              setMode((m) => (m === "password" ? "code" : "password"));
+              setError(null);
+            }}
+          >
+            {mode === "password" ? <MessageDots aria-hidden="true" /> : <Lock aria-hidden="true" />}
+            {mode === "password" ? t("login.useCode") : t("login.usePassword")}
+          </button>
+          <p className="center" style={{ fontSize: 17 }}>
+            {t("login.newHere")}{" "}
+            <Link href="/register" className="link">
+              {t("login.createAccount")}
+            </Link>
+          </p>
+        </form>
+      </main>
+    </>
+  );
+}
+
+// ===========================================================================
+// Staff Sign in (Hidden Portal for Municipal Staff and Administrators)
+// ===========================================================================
+export function StaffLoginScreen({ next }: { next?: string }) {
+  const { t } = useT();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setFieldError(null);
+    const identifier = email.trim();
+    if (!identifier || !/^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$/.test(identifier)) {
+      setFieldError(t("auth.error.INVALID_EMAIL"));
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await authCall("staff-sign-in", { email: identifier, password, next });
+      go(result.next);
+    } catch (err) {
+      const to = redirectFor(err);
+      if (to) return go(to);
+      setError(authErrorMessage(err, t));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <TopBar logo end={<span className="staff-pill staff-pill--mint">{t("nav.staff")}</span>} />
+      <main id="main" className="auth-wrap">
+        <div className="auth-hero">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/login-truck.jpg" alt="" />
+          <div className="auth-hero__shade" />
+          <p className="auth-hero__text">{t("login.staffWelcome")}</p>
+        </div>
+        <form className="auth-card stack" style={{ "--gap": "20px" } as React.CSSProperties} onSubmit={submit} noValidate>
+          <div>
+            <h1 className="display-l" style={{ fontSize: 40 }}>
+              {t("nav.staff")} {t("nav.signIn")}
+            </h1>
+            <p className="body-l" style={{ color: "var(--brand-deep)", fontSize: 20 }}>
+              {t("login.staffWelcome")}
+            </p>
+          </div>
+
+          <TextField
+            label={t("field.email")}
+            type="email"
+            value={email}
+            onChange={setEmail}
+            autoComplete="username"
+            inputMode="email"
+            placeholder="name@council.cm"
+            error={fieldError}
+            required
+            autoFocus
+          />
+
+          <div className="stack" style={{ "--gap": "10px" } as React.CSSProperties}>
+            <PasswordField label={t("field.password")} value={password} onChange={setPassword} />
+            <Link href="/forgot-password?staff=1" className="link" style={{ alignSelf: "flex-end" }}>
+              {t("login.forgot")}
+            </Link>
+          </div>
+
+          {error ? (
+            <div className="banner banner--danger" role="alert">
+              <Warning aria-hidden="true" />
+              <span>{error}</span>
+            </div>
           ) : null}
 
-          <p className="center help">
-            <button
-              type="button"
-              className="link"
-              onClick={() => {
-                setStaff((s) => !s);
-                setMode("password");
-                setError(null);
-                setFieldError(null);
-              }}
-            >
-              {staff ? t("login.citizenSwitch") : t("login.staffSwitch")}
-            </button>
-          </p>
+          <button type="submit" className="btn btn--primary btn--block btn--lg" disabled={busy}>
+            {busy ? <span className="spinner" aria-hidden="true" /> : null}
+            {t("login.submit")}
+          </button>
         </form>
       </main>
     </>
@@ -688,7 +742,7 @@ export function FirstSignInScreen({ email }: { email: string | null }) {
           <div className="stack center" style={{ "--gap": "16px" } as React.CSSProperties}>
             <h1 className="display-m">{t("verify.expiredTitle")}</h1>
             <p className="body-l">{t("first.expired")}</p>
-            <Link href="/login" className="btn btn--primary btn--block btn--lg">
+            <Link href="/staff/login" className="btn btn--primary btn--block btn--lg">
               {t("nav.signIn")}
             </Link>
           </div>

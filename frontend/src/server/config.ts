@@ -2,31 +2,59 @@
 // these variables carry the NEXT_PUBLIC_ prefix.
 
 function env(name: string): string {
-  return (process.env[name] ?? "").trim();
+  const raw = (process.env[name] ?? "").trim();
+  if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
+    return raw.slice(1, -1).trim();
+  }
+  return raw;
 }
 
+export type PoolType = "citizen" | "employee" | "admin";
+
 const apiUrl = env("CLEAN_AM_API_URL").replace(/\/+$/, "");
-const userPoolId = env("COGNITO_USER_POOL_ID");
+const defaultUserPoolId = env("COGNITO_USER_POOL_ID");
+const citizenUserPoolId = env("COGNITO_CITIZEN_USER_POOL_ID") || defaultUserPoolId;
+const employeeUserPoolId = env("COGNITO_EMPLOYEE_USER_POOL_ID");
+const adminUserPoolId = env("COGNITO_ADMIN_USER_POOL_ID");
+
+function regionFor(id: string): string {
+  return (/^([a-z]{2}(?:-[a-z]+)+-\d)_/.exec(id)?.[1] ?? env("COGNITO_REGION")) || "eu-west-1";
+}
 
 export const config = {
   apiUrl,
   cognito: {
-    // A pool ID starts with its region ("us-east-1_AbC123"), so a mistyped
-    // COGNITO_REGION can never send sign-ins to the wrong region.
-    region: (/^([a-z]{2}(?:-[a-z]+)+-\d)_/.exec(userPoolId)?.[1] ?? env("COGNITO_REGION")) || "eu-west-1",
-    userPoolId,
-    clientId: env("COGNITO_CLIENT_ID"),
-    /** Local development only. In AWS, use the ARN below instead. */
-    clientSecret: env("COGNITO_CLIENT_SECRET"),
-    /** CleanAm-Dev-Data output WebClientSecretArn: read at runtime from Secrets Manager. */
-    clientSecretArn: env("COGNITO_CLIENT_SECRET_ARN"),
-    /** CleanAm-Dev-Data output CognitoDomain, e.g. https://clean-am-dev-123456.auth.eu-west-1.amazoncognito.com */
+    region: regionFor(citizenUserPoolId),
+    userPoolId: citizenUserPoolId,
+    clientId: env("COGNITO_CITIZEN_CLIENT_ID") || env("COGNITO_CLIENT_ID"),
+    clientSecret: env("COGNITO_CITIZEN_CLIENT_SECRET") || env("COGNITO_CLIENT_SECRET"),
+    clientSecretArn: env("COGNITO_CITIZEN_CLIENT_SECRET_ARN") || env("COGNITO_CLIENT_SECRET_ARN"),
     domain: env("COGNITO_DOMAIN").replace(/\/+$/, ""),
+  },
+  employeePool: {
+    region: regionFor(employeeUserPoolId || citizenUserPoolId),
+    userPoolId: employeeUserPoolId,
+    clientId: env("COGNITO_EMPLOYEE_CLIENT_ID"),
+    clientSecret: env("COGNITO_EMPLOYEE_CLIENT_SECRET"),
+    clientSecretArn: env("COGNITO_EMPLOYEE_CLIENT_SECRET_ARN"),
+  },
+  adminPool: {
+    region: regionFor(adminUserPoolId || citizenUserPoolId),
+    userPoolId: adminUserPoolId,
+    clientId: env("COGNITO_ADMIN_CLIENT_ID"),
+    clientSecret: env("COGNITO_ADMIN_CLIENT_SECRET"),
+    clientSecretArn: env("COGNITO_ADMIN_CLIENT_SECRET_ARN"),
   },
   /** Set only when Google is configured on the user pool (backend -c googleClientId=...). */
   googleSignIn: env("GOOGLE_SIGN_IN").toLowerCase() === "true",
   secureCookies: process.env.NODE_ENV === "production",
 };
+
+export function poolConfig(pool: PoolType = "citizen") {
+  if (pool === "employee") return config.employeePool;
+  if (pool === "admin") return config.adminPool;
+  return config.cognito;
+}
 
 export function assertConfig(): void {
   const missing = [
@@ -44,47 +72,55 @@ export function assertConfig(): void {
 
 // ---------------------------------------------------------------------------
 // The Cognito app client secret
-//
-// NFR-SEC-02: credentials live in Secrets Manager. The Next.js server reads
-// the secret once per server instance (with Amplify's compute role in AWS, or
-// your AWS CLI login locally) and keeps it in memory; only its ARN is
-// configuration. When the ARN is set it always wins; a plain
-// COGNITO_CLIENT_SECRET is only a fallback for machines without AWS access.
 // ---------------------------------------------------------------------------
-let secretPromise: Promise<string> | null = null;
+const secretPromises = new Map<PoolType, Promise<string>>();
 let warned = false;
 
-export function clientSecret(): Promise<string> {
-  const { clientSecret: plain, clientSecretArn: arn } = config.cognito;
+export function clientSecret(pool: PoolType = "citizen"): Promise<string> {
+  const current = poolConfig(pool);
+  const { clientSecret: plain, clientSecretArn: arn } = current;
   if (!arn) {
     if (plain && /[\s"']/.test(plain) && !warned) {
       warned = true;
-      console.error("[config] COGNITO_CLIENT_SECRET contains spaces or quotes, so it cannot be a Cognito client secret. Paste only the secret itself.");
+      console.error(`[config] Client secret for ${pool} contains spaces or quotes. Paste only the secret itself.`);
     }
     if (plain) return Promise.resolve(plain);
+    // If employee/admin pool is not individually configured, fall back to main citizen secret
+    if (pool !== "citizen" && (config.cognito.clientSecret || config.cognito.clientSecretArn)) {
+      return clientSecret("citizen");
+    }
   } else if (plain && !warned) {
     warned = true;
-    console.warn("[config] COGNITO_CLIENT_SECRET is ignored because COGNITO_CLIENT_SECRET_ARN is set.");
+    console.warn(`[config] Client secret for ${pool} is ignored because clientSecretArn is set.`);
   }
-  if (!secretPromise) {
-    secretPromise = loadClientSecret().catch((error) => {
-      secretPromise = null; // try again on the next request
-      console.error(`[config] Could not read the client secret from Secrets Manager (${String(error?.name ?? error)}). ` +
-        "Check your AWS login (aws sts get-caller-identity) and COGNITO_CLIENT_SECRET_ARN.");
+
+  let promise = secretPromises.get(pool);
+  if (!promise) {
+    promise = loadClientSecret(arn, current.region, pool).catch((error) => {
+      secretPromises.delete(pool);
+      // Fallback for staff if pool secret missing:
+      if (pool !== "citizen" && config.cognito.clientSecretArn) {
+        return clientSecret("citizen");
+      }
+      console.error(`[config] Could not read ${pool} client secret from Secrets Manager (${String(error?.name ?? error)}).`);
       throw error;
     });
+    secretPromises.set(pool, promise);
   }
-  return secretPromise;
+  return promise;
 }
 
-async function loadClientSecret(): Promise<string> {
-  const arn = config.cognito.clientSecretArn;
-  if (!arn) throw new Error("COGNITO_CLIENT_SECRET_ARN is not set. See .env.example.");
+async function loadClientSecret(arn: string | undefined, defaultRegion: string, pool: PoolType): Promise<string> {
+  if (!arn) {
+    if (pool !== "citizen" && config.cognito.clientSecretArn) {
+      return clientSecret("citizen");
+    }
+    throw new Error(`Client secret ARN for ${pool} is not set. See .env.example.`);
+  }
   const { SecretsManagerClient, GetSecretValueCommand } = await import("@aws-sdk/client-secrets-manager");
-  // arn:aws:secretsmanager:<region>:<account>:secret:<name>
-  const region = arn.split(":")[3] || config.cognito.region;
+  const region = arn.split(":")[3] || defaultRegion;
   const result = await new SecretsManagerClient({ region }).send(new GetSecretValueCommand({ SecretId: arn }));
   const value = (result.SecretString ?? "").trim();
-  if (!value) throw new Error("The Cognito client secret in Secrets Manager is empty.");
+  if (!value) throw new Error(`The Cognito client secret in Secrets Manager for ${pool} is empty.`);
   return value;
 }

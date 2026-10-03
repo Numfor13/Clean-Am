@@ -2,7 +2,7 @@
 // anything injected into them) can never read them.
 
 import { cookies } from "next/headers";
-import { config } from "./config";
+import { config, type PoolType } from "./config";
 import {
   decodeJwt,
   guestLabelFromToken,
@@ -25,6 +25,8 @@ export const COOKIE = {
   /** State and PKCE verifier while the browser is away at Google. */
   oauth: "cam_oauth",
   lang: "cam_lang",
+  /** Which user pool this session belongs to: citizen, employee, admin */
+  pool: "cam_pool",
 } as const;
 
 const DAY = 24 * 60 * 60;
@@ -48,7 +50,7 @@ export interface Tokens {
   expiresIn?: number;
 }
 
-export function writeTokens(store: CookieStore, tokens: Tokens): IdClaims | null {
+export function writeTokens(store: CookieStore, tokens: Tokens, pool?: PoolType): IdClaims | null {
   const claims = decodeJwt(tokens.idToken);
   // The tokens inside expire after an hour; the cookies outlive them so the
   // proxy can see who the user was and refresh (see api/backend route).
@@ -59,11 +61,21 @@ export function writeTokens(store: CookieStore, tokens: Tokens): IdClaims | null
     const internal = claims?.["cognito:username"] ?? claims?.sub;
     if (internal) store.set(COOKIE.user, internal, base(30 * DAY));
   }
+  const groups = claims?.["cognito:groups"] ?? [];
+  const poolType: PoolType =
+    pool || (groups.includes("Admin") ? "admin" : groups.includes("Employee") ? "employee" : "citizen");
+  store.set(COOKIE.pool, poolType, base(30 * DAY));
   return claims;
 }
 
+export function readPool(store: CookieStore): PoolType {
+  const value = store.get(COOKIE.pool)?.value;
+  if (value === "admin" || value === "employee") return value;
+  return "citizen";
+}
+
 export function clearTokens(store: CookieStore): void {
-  for (const name of [COOKIE.id, COOKIE.access, COOKIE.refresh, COOKIE.user, COOKIE.pending]) {
+  for (const name of [COOKIE.id, COOKIE.access, COOKIE.refresh, COOKIE.user, COOKIE.pending, COOKIE.pool]) {
     store.delete(name);
   }
 }
@@ -89,6 +101,7 @@ export interface Pending {
   /** Email for the staff first-sign-in screen. */
   email?: string;
   next?: string;
+  pool?: PoolType;
 }
 
 export function writePending(store: CookieStore, pending: Pending): void {

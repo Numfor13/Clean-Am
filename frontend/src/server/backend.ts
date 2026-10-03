@@ -5,7 +5,7 @@
 import { cookies } from "next/headers";
 import { config, assertConfig } from "./config";
 import { cognitoProvider } from "./cognito";
-import { COOKIE, writeTokens } from "./session";
+import { COOKIE, readPool, writeTokens } from "./session";
 import type { AuthProvider } from "./auth-provider";
 import { decodeJwt, isExpired } from "@/lib/jwt";
 
@@ -29,8 +29,9 @@ export async function currentIdToken(store: CookieStore): Promise<string | null>
   const username = store.get(COOKIE.user)?.value ?? claims?.["cognito:username"];
   if (!refreshToken || !username) return null;
   try {
-    const tokens = await authProvider().refresh(refreshToken, username);
-    writeTokens(store, tokens);
+    const pool = readPool(store);
+    const tokens = await authProvider().refresh(refreshToken, username, pool);
+    writeTokens(store, tokens, pool);
     return tokens.idToken;
   } catch {
     return null;
