@@ -15,6 +15,7 @@ config = {
     "seed_admin_email": (context("seedAdminEmail") or "admin@clean-am.cm").strip().lower(),
     "seed_admin_email_given": bool(context("seedAdminEmail")),
     "seed_admin_name": context("seedAdminName") or "Platform Administrator",
+    "seed_admin_password": context("seedAdminPassword"),
     "ses_sender_email": context("sesSenderEmail") or "no-reply@clean-am.cm",
 }
 env = cdk.Environment(account=os.getenv("CDK_DEFAULT_ACCOUNT"), region=os.getenv("CDK_DEFAULT_REGION", "eu-west-1"))

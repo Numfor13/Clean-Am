@@ -20,6 +20,8 @@
       "aws",
       "aws-cn"
     ],
-    "@aws-cdk/core:defaultCrossStackReferences": "strong"
+    "@aws-cdk/core:defaultCrossStackReferences": "strong",
+    "frontendUrl": "https://main.d3vmgrki74q1fz.amplifyapp.com",
+    "seedAdminEmail": "numforprecious7@gmail.com"
   }
 }

@@ -32,16 +32,57 @@ EMAIL_TEXT = {
     "reset": (("Reset your CLEAN-AM password", "Your password reset code is <b>{code}</b>."),
               ("Réinitialisez votre mot de passe CLEAN-AM", "Votre code de réinitialisation est <b>{code}</b>.")),
     # Staff invitations: Cognito requires both {username} and the {####} password placeholder.
-    "invite": (("Your CLEAN-AM staff account",
-                "An administrator created a CLEAN-AM staff account for you.<br><br>"
-                "Sign in at {url}/login with your email address ({email}) and this temporary password: "
-                "<b>{code}</b><br><br>You will choose a new password when you first sign in. "
-                "This one expires in 7 days.<br><br>Account reference: {username}"),
-               ("Votre compte personnel CLEAN-AM",
-                "Un administrateur a créé un compte personnel CLEAN-AM pour vous.<br><br>"
-                "Connectez-vous sur {url}/login avec votre adresse e-mail ({email}) et ce mot de passe temporaire : "
-                "<b>{code}</b><br><br>Vous choisirez un nouveau mot de passe à la première connexion. "
-                "Celui-ci expire dans 7 jours.<br><br>Référence du compte : {username}")),
+    "invite": ((
+        "Welcome to CLEAN-AM - Staff Account Access",
+        """<div style="font-family: Arial, sans-serif; font-size: 15px; color: #1f2937; line-height: 1.6; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
+  <h2 style="color: #1e40af; margin-top: 0; font-size: 20px;">Welcome to the CLEAN-AM Staff Portal</h2>
+  <p>An administrator has created an official CLEAN-AM staff account for you.</p>
+
+  <h3 style="color: #374151; font-size: 16px; margin-bottom: 8px;">Instructions to activate your account:</h3>
+  <ol style="padding-left: 20px; margin-top: 0;">
+    <li style="margin-bottom: 8px;"><strong>Open the Staff Portal:</strong> Click the button below, or visit <a href="{url}/staff/login" style="color: #2563eb; text-decoration: underline;">{url}/staff/login</a>.</li>
+    <li style="margin-bottom: 8px;"><strong>Enter your Email:</strong> <code>{email}</code></li>
+    <li style="margin-bottom: 8px;"><strong>Enter your Temporary Password:</strong><br>
+      <span style="display: inline-block; background-color: #f3f4f6; border: 1px solid #d1d5db; padding: 6px 12px; font-family: monospace; font-size: 16px; font-weight: bold; color: #111827; border-radius: 4px; margin-top: 4px;">{code}</span>
+    </li>
+    <li style="margin-bottom: 8px;"><strong>Set your Permanent Password:</strong> Upon signing in, the system will immediately prompt you to choose your own secure password.</li>
+  </ol>
+
+  <div style="margin: 25px 0 20px 0; text-align: center;">
+    <a href="{url}/staff/login" style="background-color: #2563eb; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block;">Access Staff Portal</a>
+  </div>
+
+  <div style="font-size: 13px; color: #6b7280; border-top: 1px solid #e5e7eb; padding-top: 14px; margin-top: 20px;">
+    <p style="margin: 4px 0;"><strong>Important:</strong> This temporary password expires in 7 days. Do not share your login credentials with anyone.</p>
+    <p style="margin: 4px 0;">Account reference: {username}</p>
+  </div>
+</div>"""
+    ), (
+        "Bienvenue sur CLEAN-AM - Accès Compte Personnel",
+        """<div style="font-family: Arial, sans-serif; font-size: 15px; color: #1f2937; line-height: 1.6; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
+  <h2 style="color: #1e40af; margin-top: 0; font-size: 20px;">Bienvenue sur le portail du personnel CLEAN-AM</h2>
+  <p>Un administrateur a créé votre compte officiel de personnel CLEAN-AM.</p>
+
+  <h3 style="color: #374151; font-size: 16px; margin-bottom: 8px;">Instructions pour activer votre compte :</h3>
+  <ol style="padding-left: 20px; margin-top: 0;">
+    <li style="margin-bottom: 8px;"><strong>Ouvrez le portail du personnel :</strong> Cliquez sur le bouton ci-dessous, ou rendez-vous sur <a href="{url}/staff/login" style="color: #2563eb; text-decoration: underline;">{url}/staff/login</a>.</li>
+    <li style="margin-bottom: 8px;"><strong>Entrez votre adresse e-mail :</strong> <code>{email}</code></li>
+    <li style="margin-bottom: 8px;"><strong>Entrez votre mot de passe temporaire :</strong><br>
+      <span style="display: inline-block; background-color: #f3f4f6; border: 1px solid #d1d5db; padding: 6px 12px; font-family: monospace; font-size: 16px; font-weight: bold; color: #111827; border-radius: 4px; margin-top: 4px;">{code}</span>
+    </li>
+    <li style="margin-bottom: 8px;"><strong>Définissez votre mot de passe permanent :</strong> Dès votre connexion, le système vous demandera de choisir un mot de passe sécurisé et définitif.</li>
+  </ol>
+
+  <div style="margin: 25px 0 20px 0; text-align: center;">
+    <a href="{url}/staff/login" style="background-color: #2563eb; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block;">Accéder au portail du personnel</a>
+  </div>
+
+  <div style="font-size: 13px; color: #6b7280; border-top: 1px solid #e5e7eb; padding-top: 14px; margin-top: 20px;">
+    <p style="margin: 4px 0;"><strong>Important :</strong> Ce mot de passe temporaire expire dans 7 jours. Ne partagez jamais vos identifiants.</p>
+    <p style="margin: 4px 0;">Référence du compte : {username}</p>
+  </div>
+</div>"""
+    )),
 }
 MESSAGE_KIND = {
     "CustomMessage_SignUp": "verify", "CustomMessage_ResendCode": "verify",

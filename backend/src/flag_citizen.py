@@ -132,7 +132,8 @@ def set_suspended(event, who, citizen_id: str, suspend: bool):
     # Disabling the Cognito user also stops any session that is still open.
     action = client("cognito-idp").admin_disable_user if suspend else client("cognito-idp").admin_enable_user
     try:
-        action(UserPoolId=os.environ["USER_POOL_ID"], Username=citizen.get("cognito_username") or citizen_id)
+        pool = os.environ.get("CITIZEN_USER_POOL_ID", os.environ.get("USER_POOL_ID", ""))
+        action(UserPoolId=pool, Username=citizen.get("cognito_username") or citizen_id)
     except ClientError:
         logger.exception("could not update Cognito user %s", citizen_id)
 

@@ -14,7 +14,7 @@ applications:
             # runtime only through .env.production. Copy just this app's
             # variables (never COGNITO_CLIENT_SECRET: in AWS the secret is
             # read from Secrets Manager via COGNITO_CLIENT_SECRET_ARN).
-            - env | grep -E '^(CLEAN_AM_[A-Z_]+|COGNITO_(REGION|USER_POOL_ID|CLIENT_ID|CLIENT_SECRET_ARN|DOMAIN)|GOOGLE_SIGN_IN)=' >> .env.production || true
+            - env | grep -E '^(CLEAN_AM_[A-Z_]+|COGNITO_[A-Z_]+|GOOGLE_SIGN_IN)=' | grep -v '_CLIENT_SECRET=' >> .env.production || true
             - npm run build
       artifacts:
         baseDirectory: .next

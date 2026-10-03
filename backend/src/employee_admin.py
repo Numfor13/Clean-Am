@@ -46,7 +46,7 @@ def create(event, who):
     if table("employees").query(IndexName="GSI-email", KeyConditionExpression=Key("email").eq(email), Limit=1)["Items"]:
         raise ApiError(409, "EMAIL_EXISTS", "An account with that email address already exists.")
 
-    cognito, pool = client("cognito-idp"), os.environ["USER_POOL_ID"]
+    cognito, pool = client("cognito-idp"), os.environ.get("EMPLOYEE_USER_POOL_ID", os.environ.get("USER_POOL_ID", ""))
     try:
         # The pool allows sign-in by SMS code, so Cognito no longer invents a
         # password for a user without a phone: we pass one. Cognito emails it in
@@ -112,7 +112,8 @@ def revoke(who, employee_id: str):
         Key={"employee_id": employee_id}, UpdateExpression="SET is_active = :no, deactivated_at = :now, deactivated_by = :me",
         ExpressionAttributeValues={":no": False, ":now": now(), ":me": who.id}, ReturnValues="ALL_NEW")
     try:
-        client("cognito-idp").admin_disable_user(UserPoolId=os.environ["USER_POOL_ID"], Username=employee["cognito_username"])
+        pool = os.environ.get("EMPLOYEE_USER_POOL_ID", os.environ.get("USER_POOL_ID", ""))
+        client("cognito-idp").admin_disable_user(UserPoolId=pool, Username=employee["cognito_username"])
     except ClientError:
         logger.exception("could not disable %s in Cognito", employee_id)
     return respond(200, {"employee": plain(result["Attributes"])})

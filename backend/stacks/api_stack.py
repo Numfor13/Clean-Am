@@ -18,7 +18,10 @@ SRC = os.path.join(os.path.dirname(__file__), "..", "src")
 class ApiStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, config: dict, data, **kwargs):
         super().__init__(scope, construct_id, **kwargs)
-        stage, tables, bucket, pool = config["stage"], data.tables, data.photo_bucket, data.user_pool
+        stage, tables, bucket = config["stage"], data.tables, data.photo_bucket
+        citizen_pool = data.citizen_user_pool
+        employee_pool = data.employee_user_pool
+        admin_pool = data.admin_user_pool
 
         # --- Email queue: requests never wait for SES; failures retry 3 times ------
         dead_letters = sqs.Queue(self, "NotificationDLQ", retention_period=Duration.days(14), enforce_ssl=True)
@@ -29,7 +32,10 @@ class ApiStack(Stack):
             **{f"{name.upper()}_TABLE": t.table_name for name, t in tables.items()},
             "PHOTO_BUCKET": bucket.bucket_name,
             "NOTIFICATION_QUEUE_URL": queue.queue_url,
-            "USER_POOL_ID": pool.user_pool_id,
+            "USER_POOL_ID": citizen_pool.user_pool_id,
+            "CITIZEN_USER_POOL_ID": citizen_pool.user_pool_id,
+            "EMPLOYEE_USER_POOL_ID": employee_pool.user_pool_id,
+            "ADMIN_USER_POOL_ID": admin_pool.user_pool_id,
             "GUEST_TOKEN_SECRET_ARN": data.guest_token_secret.secret_arn,
             "FRONTEND_URL": config["frontend_url"],
         }
@@ -86,12 +92,19 @@ class ApiStack(Stack):
         authorizer_fn = function("guest_authorizer", memory=128)
         data.guest_token_secret.grant_read(authorizer_fn)
 
-        # Only these three functions change Cognito users, each with just what it needs.
-        for fn, actions in ((employee_admin, ["AdminCreateUser", "AdminAddUserToGroup", "AdminDeleteUser", "AdminDisableUser"]),
-                            (flag, ["AdminDisableUser", "AdminEnableUser"]),
-                            (public, ["AdminUpdateUserAttributes"])):
-            fn.add_to_role_policy(iam.PolicyStatement(actions=[f"cognito-idp:{a}" for a in actions],
-                                                      resources=[pool.user_pool_arn]))
+        # Specific IAM permissions for each pool
+        employee_admin.add_to_role_policy(iam.PolicyStatement(
+            actions=["cognito-idp:AdminCreateUser", "cognito-idp:AdminAddUserToGroup",
+                     "cognito-idp:AdminDeleteUser", "cognito-idp:AdminDisableUser"],
+            resources=[employee_pool.user_pool_arn]))
+
+        flag.add_to_role_policy(iam.PolicyStatement(
+            actions=["cognito-idp:AdminDisableUser", "cognito-idp:AdminEnableUser"],
+            resources=[citizen_pool.user_pool_arn]))
+
+        public.add_to_role_policy(iam.PolicyStatement(
+            actions=["cognito-idp:AdminUpdateUserAttributes"],
+            resources=[citizen_pool.user_pool_arn, employee_pool.user_pool_arn, admin_pool.user_pool_arn]))
 
         sender = function("notification_sender", extra_env={"SES_SENDER_EMAIL": config["ses_sender_email"]})
         sender.add_event_source(sources.SqsEventSource(queue, batch_size=10, report_batch_item_failures=True,
@@ -116,7 +129,9 @@ class ApiStack(Stack):
                 }))
 
         signed_in = {"authorization_type": apigw.AuthorizationType.COGNITO,
-                     "authorizer": apigw.CognitoUserPoolsAuthorizer(self, "CognitoAuthorizer", cognito_user_pools=[pool])}
+                     "authorizer": apigw.CognitoUserPoolsAuthorizer(
+                         self, "CognitoAuthorizer",
+                         cognito_user_pools=[admin_pool, employee_pool, citizen_pool])}
         guest = {"authorization_type": apigw.AuthorizationType.CUSTOM,
                  "authorizer": apigw.TokenAuthorizer(
                      self, "GuestTokenAuthorizer", handler=authorizer_fn,

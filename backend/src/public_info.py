@@ -71,8 +71,9 @@ def me(event):
         if "language" in updates and who.cognito_username:
             # Cognito words the SMS codes and emails from custom:language.
             try:
+                pool_id = os.environ.get("ADMIN_USER_POOL_ID" if who.role == "Admin" else "EMPLOYEE_USER_POOL_ID" if who.role == "Employee" else "CITIZEN_USER_POOL_ID", os.environ.get("USER_POOL_ID", ""))
                 client("cognito-idp").admin_update_user_attributes(
-                    UserPoolId=os.environ["USER_POOL_ID"], Username=who.cognito_username,
+                    UserPoolId=pool_id, Username=who.cognito_username,
                     UserAttributes=[{"Name": "custom:language", "Value": updates["language"]}])
             except ClientError:
                 logger.exception("could not update the Cognito language for %s", who.id)
