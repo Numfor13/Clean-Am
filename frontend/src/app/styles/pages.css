@@ -53,7 +53,7 @@
 
 @media (min-width: 900px) {
   .public-header__end {
-    margin-left: 0;
+    margin-left: auto;
   }
 }
 

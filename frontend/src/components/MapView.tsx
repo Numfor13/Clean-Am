@@ -119,10 +119,11 @@ export function MapView({
       if (!map.current) return;
       const L = await loadLeaflet();
       placeMarker(L, pin ?? null);
-      map.current.setView([center.lat, center.lng], map.current.getZoom(), { animate: true });
+      map.current.setView([center.lat, center.lng], zoom ?? map.current.getZoom(), { animate: true });
+      map.current.invalidateSize();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pin?.lat, pin?.lng, center.lat, center.lng]);
+  }, [pin?.lat, pin?.lng, center.lat, center.lng, zoom]);
 
   return (
     <div className="map" style={{ "--map-h": `${height}px` } as React.CSSProperties} role="region" aria-label={label}>

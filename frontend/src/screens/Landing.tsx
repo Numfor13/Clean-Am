@@ -8,6 +8,7 @@ import { formatNumber } from "@/lib/format";
 import type { PublicStats } from "@/lib/types";
 import { PublicFooter, PublicHeader } from "@/components/public";
 import { InstallCard } from "@/components/pwa";
+import { ParallaxSection } from "@/components/ParallaxSection";
 import {
   ArrowRight,
   CalendarDays,
@@ -87,7 +88,7 @@ export function LandingScreen() {
       <PublicHeader />
       <main id="main">
         {/* ---------------- Hero ---------------- */}
-        <section className="hero on-deep">
+        <section className="hero on-deep" id="top">
           <Leaves side="left" />
           <div className="hero__grid container">
             <div className="hero__copy">
@@ -205,6 +206,58 @@ export function LandingScreen() {
           </div>
           <HowItWorks />
         </section>
+
+        {/* ---------------- Parallax Showcase Section ---------------- */}
+        <ParallaxSection
+          bgImage="/images/hero-crew.jpg"
+          bgAlt="Municipal waste management in action"
+          bleedPercent={35}
+          bgSpeed={18}
+          fgShift={36}
+          minHeight="540px"
+          className="showcase-parallax on-deep"
+        >
+          <div className="container" style={{ textAlign: "center", padding: "80px 24px" }}>
+            <span
+              className="eyebrow-pill"
+              style={{
+                background: "rgba(201, 247, 221, 0.16)",
+                color: "#c9f7dd",
+                border: "1px solid rgba(201, 247, 221, 0.3)",
+                backdropFilter: "blur(10px)",
+                margin: "0 auto 20px",
+              }}
+            >
+              <Leaf aria-hidden="true" />
+              Empowered Action · High Performance
+            </span>
+            <h2 className="display-l" style={{ color: "#ffffff", maxWidth: "800px", margin: "0 auto 18px", fontSize: "clamp(2rem, 4vw, 3.2rem)", lineHeight: 1.15 }}>
+              Clean Streets. Rapid Response. <span className="accent">Measurable Impact.</span>
+            </h2>
+            <p className="body-l" style={{ color: "rgba(255, 255, 255, 0.88)", maxWidth: "660px", margin: "0 auto 36px", fontSize: "clamp(1.05rem, 1.8vw, 1.25rem)" }}>
+              Every citizen photo is directly routed to dispatch crews in real time. Experience transparent municipal hygiene with zero delays.
+            </p>
+            <div style={{ display: "flex", gap: "16px", justifyContent: "center", flexWrap: "wrap", alignItems: "center" }}>
+              <Link href="/report" className="btn btn--primary btn--lg" style={{ boxShadow: "0 8px 24px rgba(42, 148, 87, 0.35)" }}>
+                <Camera aria-hidden="true" />
+                {t("home.cta")}
+              </Link>
+              <Link
+                href="/register"
+                className="btn btn--lg"
+                style={{
+                  background: "rgba(255, 255, 255, 0.12)",
+                  color: "#ffffff",
+                  border: "1px solid rgba(255, 255, 255, 0.28)",
+                  backdropFilter: "blur(12px)",
+                }}
+              >
+                {t("landing.join")}
+                <ArrowRight aria-hidden="true" />
+              </Link>
+            </div>
+          </div>
+        </ParallaxSection>
 
         {/* ---------------- Commitment ---------------- */}
         <section className="commitment on-deep" id="about" aria-labelledby="about-title">

@@ -188,7 +188,15 @@ export function PasswordField({
 }
 
 /** The rules, visible before the person types, ticking off as they do. */
-export function PasswordRules({ password, confirm }: { password: string; confirm?: string }) {
+export function PasswordRules({
+  password,
+  confirm,
+  omitMatch = false,
+}: {
+  password: string;
+  confirm?: string;
+  omitMatch?: boolean;
+}) {
   const { t } = useT();
   const c = passwordChecks(password, confirm);
   const rules: [boolean, string][] = [
@@ -198,7 +206,7 @@ export function PasswordRules({ password, confirm }: { password: string; confirm
     [c.symbol, t("password.rule.symbol")],
   ];
   if (password.length > 0 && !c.lower) rules.push([false, t("password.rule.lower")]);
-  if (confirm !== undefined) rules.push([c.match, t("password.rule.match")]);
+  if (!omitMatch && confirm !== undefined) rules.push([c.match, t("password.rule.match")]);
   return (
     <ul className="rules" aria-label={t("password.rules")}>
       {rules.map(([met, text]) => (
@@ -215,6 +223,26 @@ export function PasswordRules({ password, confirm }: { password: string; confirm
     </ul>
   );
 }
+
+/** Checkbox/rule indicating if password and confirmation match, placed under the confirm password field. */
+export function PasswordMatchRule({ password, confirm }: { password: string; confirm: string }) {
+  const { t } = useT();
+  const c = passwordChecks(password, confirm);
+  return (
+    <ul className="rules" aria-label={t("password.rules")}>
+      <li data-met={c.match ? "true" : "false"}>
+        <span className="rule-mark" aria-hidden="true">
+          {c.match ? <Check strokeWidth={3} /> : null}
+        </span>
+        <span>
+          {t("password.rule.match")}
+          <span className="sr-only">{c.match ? ` (${t("password.met")})` : ` (${t("password.notMet")})`}</span>
+        </span>
+      </li>
+    </ul>
+  );
+}
+
 
 /** Six boxes that behave like one field: paste, autofill and backspace all work. */
 export function OtpInput({

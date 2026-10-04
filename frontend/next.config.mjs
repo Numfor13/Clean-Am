@@ -4,6 +4,9 @@ const nextConfig = {
   poweredByHeader: false,
   // Linting is not part of this project's build; `npm run typecheck` is.
   eslint: { ignoreDuringBuilds: true },
+  experimental: {
+    optimizePackageImports: ["react-icons", "leaflet", "framer-motion"],
+  },
   // `npm run dev` opened from a phone at this computer's network address.
   allowedDevOrigins: ["10.*.*.*", "172.*.*.*", "192.168.*.*"],
   async headers() {

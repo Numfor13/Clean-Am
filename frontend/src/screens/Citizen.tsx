@@ -133,20 +133,11 @@ export function SubmittedScreen() {
                   <StatusChip status={report.status} large />
                 </span>
               </div>
-              {guest ? (
-                <div>
-                  <div className="kv-label">{t("submitted.sentAs")}</div>
-                  <div className="mono strong" style={{ fontSize: 18 }}>
-                    {report.username || data.guestLabel}
-                  </div>
-                </div>
-              ) : null}
-              <div>
-                <div className="kv-label">{guest ? t("submitted.reference") : t("submitted.yourReference")}</div>
-                <div className="copy-row mono strong">
-                  {report.report_id}
-                  <CopyButton text={report.report_id} />
-                </div>
+              <div className="row" style={{ alignItems: "center", gap: 10, fontSize: 22, fontWeight: 700, color: "var(--brand-deep)", marginTop: 4 }}>
+                <span className="icon-disc" style={{ "--size": "34px", background: "#c9f7dd", color: "var(--brand-deep)" } as React.CSSProperties}>
+                  <Check strokeWidth={3} aria-hidden="true" style={{ width: 20, height: 20 }} />
+                </span>
+                <span>{t("submitted.sent")}</span>
               </div>
             </div>
           </div>
@@ -358,9 +349,6 @@ export function CitizenReportScreen({ id }: { id: string }) {
               </h2>
               <div className="row wrap">
                 <StatusChip status={report.status} large />
-                <span className="mono text-brand" style={{ fontSize: 17 }}>
-                  {report.report_id}
-                </span>
               </div>
             </div>
 

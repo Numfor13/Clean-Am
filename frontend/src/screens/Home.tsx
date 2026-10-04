@@ -39,9 +39,9 @@ export function HomeScreen({ mode }: { mode: "guest" | "citizen" }) {
 
   return (
     <>
-      {mode === "guest" ? <PublicHeader minimal /> : <TopBar logo end={<LangSwitch />} />}
+      <PublicHeader />
       <main id="main">
-        <section className="home-hero on-deep">
+        <section className="home-hero on-deep" id="top">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/images/guest-hero.jpg" alt="" />
           <div className="home-hero__copy">
@@ -112,7 +112,7 @@ export function HomeScreen({ mode }: { mode: "guest" | "citizen" }) {
 
           <InstallCard />
 
-          <section className="stack" style={{ "--gap": "16px" } as React.CSSProperties} aria-labelledby="how-title">
+          <section className="stack" style={{ "--gap": "16px" } as React.CSSProperties} id="how" aria-labelledby="how-title">
             <div>
               <h2 id="how-title" className="display-m" style={{ fontSize: 30 }}>
                 {t("how.title")}
@@ -122,7 +122,7 @@ export function HomeScreen({ mode }: { mode: "guest" | "citizen" }) {
             <HowItWorks />
           </section>
 
-          <section className="stack" style={{ "--gap": "12px" } as React.CSSProperties} aria-labelledby="svc-title">
+          <section className="stack" style={{ "--gap": "12px" } as React.CSSProperties} id="services" aria-labelledby="svc-title">
             <div>
               <h2 id="svc-title" className="display-m" style={{ fontSize: 30 }}>
                 {t("home.servicesTitle")}

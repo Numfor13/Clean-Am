@@ -8,7 +8,7 @@ import type { MessageKey } from "@/lib/messages";
 import { toE164 } from "@/lib/format";
 import { usernameOk } from "@/lib/reports";
 import { useSession } from "@/components/Providers";
-import { LangSwitch, LanguageToggle, OtpInput, PasswordField, PasswordRules, PhoneInput, TextField, passwordOk } from "@/components/forms";
+import { LangSwitch, LanguageToggle, OtpInput, PasswordField, PasswordRules, PasswordMatchRule, PhoneInput, TextField, passwordOk } from "@/components/forms";
 import { TopBar } from "@/components/shell";
 import { CheckCircle, GoogleLogo, Lock, Mail, MessageDots, ShieldCheck, Smartphone, User, Warning } from "@/components/icons";
 import { FieldError } from "@/components/ui";
@@ -697,9 +697,12 @@ export function ResetScreen({ destination }: { destination: string | null }) {
           </div>
           <div className="stack" style={{ "--gap": "10px" } as React.CSSProperties}>
             <PasswordField label={t("field.newPassword")} value={password} onChange={setPassword} autoComplete="new-password" />
-            <PasswordRules password={password} confirm={confirm} />
+            <PasswordRules password={password} omitMatch />
           </div>
-          <PasswordField label={t("field.confirmPassword")} value={confirm} onChange={setConfirm} autoComplete="new-password" />
+          <div className="stack" style={{ "--gap": "10px" } as React.CSSProperties}>
+            <PasswordField label={t("field.confirmPassword")} value={confirm} onChange={setConfirm} autoComplete="new-password" />
+            <PasswordMatchRule password={password} confirm={confirm} />
+          </div>
           <FieldError>{error}</FieldError>
           <button type="submit" className="btn btn--primary btn--block btn--lg" disabled={busy}>
             {busy ? <span className="spinner" aria-hidden="true" /> : null}
@@ -774,9 +777,12 @@ export function FirstSignInScreen({ email }: { email: string | null }) {
             ) : null}
             <div className="stack" style={{ "--gap": "10px" } as React.CSSProperties}>
               <PasswordField label={t("field.newPassword")} value={password} onChange={setPassword} autoComplete="new-password" autoFocus />
-              <PasswordRules password={password} confirm={confirm} />
+              <PasswordRules password={password} omitMatch />
             </div>
-            <PasswordField label={t("field.confirmPassword")} value={confirm} onChange={setConfirm} autoComplete="new-password" />
+            <div className="stack" style={{ "--gap": "10px" } as React.CSSProperties}>
+              <PasswordField label={t("field.confirmPassword")} value={confirm} onChange={setConfirm} autoComplete="new-password" />
+              <PasswordMatchRule password={password} confirm={confirm} />
+            </div>
             <FieldError>{error}</FieldError>
             <button type="submit" className="btn btn--primary btn--block btn--lg" disabled={busy}>
               {busy ? <span className="spinner" aria-hidden="true" /> : null}

@@ -45,12 +45,14 @@ export function ReportCard({ report, href, showReporter }: { report: Report; hre
           </>
         )}
         <div className="report-card__foot">
-          <span>
-            {t("report.ref")}{" "}
-            <span className="mono" style={{ color: "var(--ink-strong)" }}>
-              {report.report_id}
+          {showReporter ? (
+            <span>
+              {t("report.ref")}{" "}
+              <span className="mono" style={{ color: "var(--ink-strong)" }}>
+                {report.report_id}
+              </span>
             </span>
-          </span>
+          ) : <span />}
           <ChevronRight aria-hidden="true" />
         </div>
       </div>

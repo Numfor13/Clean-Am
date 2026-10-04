@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { site } from "@/lib/site";
 import { useSession } from "./Providers";
 import { LangSwitch } from "./forms";
-import { ArrowRight, Close, Facebook, Instagram, Mail, MapPin, Menu, Phone, XTwitter, Youtube, ChevronDown } from "./icons";
+import { ArrowLeft, ArrowRight, Close, Facebook, Instagram, Mail, MapPin, Menu, Phone, XTwitter, Youtube, ChevronDown } from "./icons";
 import { Logo } from "./ui";
 import { homeFor } from "@/lib/jwt";
 
@@ -14,8 +15,10 @@ import { homeFor } from "@/lib/jwt";
 export function PublicHeader({ minimal }: { minimal?: boolean }) {
   const { t } = useT();
   const session = useSession();
+  const pathname = usePathname() ?? "";
   const [open, setOpen] = useState(false);
   const signedIn = Boolean(session.role);
+  const isAccountArea = pathname.startsWith("/home") || pathname.startsWith("/my-reports") || pathname.startsWith("/profile");
 
   useEffect(() => {
     if (!open) return;
@@ -24,18 +27,36 @@ export function PublicHeader({ minimal }: { minimal?: boolean }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
-  const links = [
-    { href: "/", label: t("nav.home") },
-    { href: "/#services", label: t("nav.services") },
-    { href: "/#how", label: t("nav.reportGuide") },
-    { href: "/#about", label: t("nav.about") },
-    { href: "/#contact", label: t("nav.contact") },
-  ];
+  const isSelfContained = pathname === "/" || pathname === "/home" || pathname === "/guest";
+  const prefix = isSelfContained ? "" : (isAccountArea ? "/home" : "/");
+
+  const links = isAccountArea
+    ? [
+        { href: `${prefix}#services`, label: t("nav.services") },
+        { href: `${prefix}#how`, label: t("nav.reportGuide") },
+      ]
+    : [
+        { href: `${prefix}#services`, label: t("nav.services") },
+        { href: `${prefix}#how`, label: t("nav.reportGuide") },
+        { href: `${prefix}#about`, label: t("nav.about") },
+        { href: `${prefix}#contact`, label: t("nav.contact") },
+      ];
 
   return (
     <header className="public-header on-deep">
       <div className="public-header__inner">
-        <Logo sub={t("brand.sub")} />
+        {isAccountArea ? (
+          <Link
+            href="/"
+            className="icon-btn topbar__back"
+            aria-label={t("common.back") || "Back to landing page"}
+            title="Back to landing page"
+            style={{ marginRight: 6 }}
+          >
+            <ArrowLeft aria-hidden="true" style={{ width: 22, height: 22 }} />
+          </Link>
+        ) : null}
+        <Logo sub={t("brand.sub")} href={isAccountArea ? "/home" : "/"} />
         {!minimal ? (
           <nav className="public-nav desktop-only" aria-label={t("nav.main")}>
             {links.map((l) => (
@@ -49,15 +70,17 @@ export function PublicHeader({ minimal }: { minimal?: boolean }) {
           <span className="desktop-only">
             <LangSwitch />
           </span>
-          {signedIn ? (
-            <Link href={homeFor(session.role)} className="topbar__link">
-              {t("nav.myAccount")}
-            </Link>
-          ) : (
-            <Link href="/login" className="topbar__link">
-              {t("nav.signIn")}
-            </Link>
-          )}
+          {!isAccountArea ? (
+            signedIn ? (
+              <Link href={homeFor(session.role)} className="topbar__link">
+                {t("nav.myAccount")}
+              </Link>
+            ) : (
+              <Link href="/login" className="topbar__link">
+                {t("nav.signIn")}
+              </Link>
+            )
+          ) : null}
           <Link href="/report" className="btn btn--primary btn--sm desktop-only">
             {t("nav.submitReport")}
             <ArrowRight aria-hidden="true" />
@@ -82,6 +105,17 @@ export function PublicHeader({ minimal }: { minimal?: boolean }) {
                 {l.label}
               </Link>
             ))}
+            {!isAccountArea ? (
+              signedIn ? (
+                <Link key="account" href={homeFor(session.role)} onClick={() => setOpen(false)}>
+                  {t("nav.myAccount")}
+                </Link>
+              ) : (
+                <Link key="login" href="/login" onClick={() => setOpen(false)}>
+                  {t("nav.signIn")}
+                </Link>
+              )
+            ) : null}
             <Link href="/report" className="btn btn--primary" style={{ marginTop: 16 }} onClick={() => setOpen(false)}>
               {t("nav.submitReport")}
             </Link>

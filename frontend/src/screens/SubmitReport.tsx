@@ -111,6 +111,23 @@ export function SubmitReportScreen() {
   }, []);
 
   // ---- location --------------------------------------------------------------
+  const reverseGeocode = useCallback(async (lat: number, lng: number) => {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+        { headers: { "Accept-Language": "en,fr" } },
+      );
+      if (!res.ok) return null;
+      const data = await res.json();
+      const addr = (data.address || {}) as Record<string, string>;
+      const foundCity = addr.city || addr.town || addr.municipality || addr.state_district || addr.county || "";
+      const foundQuarter = addr.suburb || addr.neighbourhood || addr.quarter || addr.residential || addr.road || "";
+      return { city: foundCity, quarter: foundQuarter };
+    } catch {
+      return null;
+    }
+  }, []);
+
   const applyPoint = useCallback(
     (point: LatLng, source: "gps" | "manual") => {
       if (!isInCameroon(point.lat, point.lng)) {
@@ -126,22 +143,61 @@ export function SubmitReportScreen() {
         if (place) {
           setCity(place.city);
           setQuarter(place.quarter);
+        } else {
+          reverseGeocode(point.lat, point.lng).then((res) => {
+            if (!res) return;
+            const matchedCity = Object.keys(CITIES).find(
+              (c) => c.toLowerCase() === res.city.toLowerCase() || (res.city && c.toLowerCase().includes(res.city.toLowerCase())),
+            );
+            if (matchedCity) {
+              setCity(matchedCity);
+              const qMatch = CITIES[matchedCity]?.find(
+                (q) => q.name.toLowerCase() === res.quarter.toLowerCase() || (res.quarter && q.name.toLowerCase().includes(res.quarter.toLowerCase())),
+              );
+              if (qMatch) {
+                setQuarter(qMatch.name);
+              } else if (res.quarter) {
+                setQuarter(OTHER);
+                setCustomQuarter(res.quarter);
+              }
+            } else if (res.quarter) {
+              setQuarter(OTHER);
+              setCustomQuarter(res.quarter + (res.city ? `, ${res.city}` : ""));
+            }
+          });
         }
       }
     },
-    [placeTouched],
+    [placeTouched, reverseGeocode],
   );
 
   const locate = useCallback(() => {
+    if (typeof window !== "undefined" && !window.isSecureContext && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+      setLocState("unavailable");
+      return;
+    }
     if (!("geolocation" in navigator)) {
       setLocState("unavailable");
       return;
     }
     setLocState("locating");
+    setErrors((e) => ({ ...e, location: "" }));
     navigator.geolocation.getCurrentPosition(
       (pos) => applyPoint({ lat: pos.coords.latitude, lng: pos.coords.longitude }, "gps"),
-      (err) => setLocState(err.code === err.PERMISSION_DENIED ? "denied" : "unavailable"),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 },
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) {
+          setLocState("denied");
+        } else {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => applyPoint({ lat: pos.coords.latitude, lng: pos.coords.longitude }, "gps"),
+            (fallbackErr) => {
+              setLocState(fallbackErr.code === fallbackErr.PERMISSION_DENIED ? "denied" : "unavailable");
+            },
+            { enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 },
+          );
+        }
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 15000 },
     );
   }, [applyPoint]);
 
@@ -388,9 +444,17 @@ export function SubmitReportScreen() {
             </div>
 
             {locState === "denied" || locState === "unavailable" ? (
-              <div className="banner banner--warning" role="status">
-                <Warning aria-hidden="true" />
-                <span>{locState === "denied" ? t("submit.locationDenied") : t("submit.locationUnavailable")}</span>
+              <div className="banner banner--warning" role="status" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Warning aria-hidden="true" />
+                  <span>{locState === "denied" ? t("submit.locationDenied") : t("submit.locationUnavailable")}</span>
+                </div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button type="button" className="btn btn--sm btn--primary" onClick={locate}>
+                    <LocateFixed aria-hidden="true" style={{ width: 16, height: 16 }} />
+                    {t("submit.retryLocation")}
+                  </button>
+                </div>
               </div>
             ) : null}
 
@@ -458,8 +522,15 @@ export function SubmitReportScreen() {
                   value={quarter}
                   aria-invalid={errors.quarter ? true : undefined}
                   onChange={(e) => {
-                    setQuarter(e.target.value);
+                    const nextQ = e.target.value;
+                    setQuarter(nextQ);
                     setPlaceTouched(true);
+                    const foundQ = quarters.find((q) => q.name === nextQ);
+                    if (foundQ) {
+                      setLocation({ lat: foundQ.lat, lng: foundQ.lng });
+                      setLocState("manual");
+                      setErrors((err) => ({ ...err, location: "" }));
+                    }
                   }}
                 >
                   <option value="">{t("submit.chooseQuarter")}</option>
@@ -480,9 +551,16 @@ export function SubmitReportScreen() {
                   className="select"
                   value={city}
                   onChange={(e) => {
-                    setCity(e.target.value);
+                    const nextCity = e.target.value;
+                    setCity(nextCity);
                     setQuarter("");
                     setPlaceTouched(true);
+                    const cityQuarters = CITIES[nextCity];
+                    if (cityQuarters && cityQuarters.length > 0) {
+                      setLocation({ lat: cityQuarters[0].lat, lng: cityQuarters[0].lng });
+                      setLocState("manual");
+                      setErrors((err) => ({ ...err, location: "" }));
+                    }
                   }}
                 >
                   {Object.keys(CITIES).map((c) => (

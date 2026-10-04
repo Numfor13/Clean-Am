@@ -93,7 +93,7 @@ export function TabBar() {
         {tabs.map(({ href, label, icon: Icon }) => {
           const current = pathname === href || pathname.startsWith(`${href}/`);
           return (
-            <Link key={href} href={href} className="tab" aria-current={current ? "page" : undefined}>
+            <Link key={href} href={href} prefetch={true} className="tab" aria-current={current ? "page" : undefined}>
               {current ? (
                 <span className="tab__raise">
                   <Icon aria-hidden="true" />

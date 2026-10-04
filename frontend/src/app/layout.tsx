@@ -38,6 +38,8 @@ export const viewport: Viewport = {
   themeColor: "#06180d",
 };
 
+import { LenisProvider } from "@/components/LenisProvider";
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const [lang, session] = await Promise.all([getLang(), getSession()]);
   return (
@@ -47,8 +49,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {lang === "fr" ? "Aller au contenu" : "Skip to content"}
         </a>
         <Providers lang={lang} session={session}>
-          {children}
-          <PwaSetup />
+          <LenisProvider>
+            {children}
+            <PwaSetup />
+          </LenisProvider>
         </Providers>
       </body>
     </html>
