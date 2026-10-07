@@ -10,7 +10,8 @@ from decimal import Decimal
 
 from botocore.exceptions import ClientError
 
-from common import (GUEST_PREFIX, PENDING, ApiError, Key, api, body, caller, client, conditional_failed,
+from assignment import choose_assignees
+from common import (GUEST_PREFIX, IN_PROGRESS, PENDING, ApiError, Key, api, body, caller, client, conditional_failed,
                     msg, new_id, now, query_all, reporter, respond, search_text, staging_prefix, table, text,
                     verify_guest_token, with_photo)
 
@@ -130,6 +131,17 @@ def submit(event):
         "updated_at": timestamp,
         "status_history": [{"status": PENDING, "at": timestamp, "by": who.id, "by_role": who.role}],
     }
+    # Auto-assign to the nearest employees whose zones cover this quarter (Item 2).
+    # If no one covers it, the report stays PENDING and unassigned and surfaces in
+    # the admin's "unassigned" queue (Item 4).
+    assignees = choose_assignees(quarter, category, lat, lng)
+    if assignees:
+        report["assigned_to"] = [e["employee_id"] for e in assignees]
+        report["assigned_names"] = [e.get("name") or e["employee_id"] for e in assignees]
+        report["assigned_at"] = timestamp
+        report["status"] = IN_PROGRESS
+        report["status_history"].append(
+            {"status": IN_PROGRESS, "at": timestamp, "by": "system", "by_role": "System", "note": "Auto-assigned"})
     if who.is_guest:
         report["guest_id"] = who.guest_id
     report["search_text"] = search_text(report)

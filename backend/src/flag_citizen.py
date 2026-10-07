@@ -24,6 +24,24 @@ def add_flag(table_name: str, key: dict) -> dict:
         ExpressionAttributeValues={":one": 1, ":now": now()}, ReturnValues="ALL_NEW")["Attributes"]
 
 
+def auto_suspend_citizen(citizen_id: str, citizen: dict, flag_count: int, timestamp: str) -> None:
+    """At the flag threshold the system suspends the citizen itself, no admin needed (Item 3)."""
+    table("citizens").update_item(
+        Key={"citizen_id": citizen_id},
+        UpdateExpression="SET is_suspended = :yes, suspended_at = :now, suspended_by = :sys, suspended_reason = :why",
+        ExpressionAttributeValues={":yes": "true", ":now": timestamp, ":sys": "system",
+                                   ":why": f"Automatically suspended after reaching {flag_count} flags."})
+    try:
+        pool = os.environ.get("CITIZEN_USER_POOL_ID", os.environ.get("USER_POOL_ID", ""))
+        client("cognito-idp").admin_disable_user(
+            UserPoolId=pool, Username=citizen.get("cognito_username") or citizen_id)
+    except ClientError:
+        logger.exception("could not disable Cognito user %s", citizen_id)
+    if citizen.get("email") and citizen.get("email_verified") is True:
+        notify("CITIZEN_SUSPENDED", {"email": citizen["email"], "username": citizen.get("username"),
+                                     "language": citizen.get("language", "en"), "flag_count": flag_count})
+
+
 def flag_report(event):
     who = caller(event, "Employee")
     data = body(event)
@@ -63,10 +81,14 @@ def flag_report(event):
 
     citizen = add_flag("citizens", {"citizen_id": report["citizen_id"]})
     count = int(citizen["flag_count"])
+    suspended = is_true(citizen.get("is_suspended"))
+    if count >= FLAG_THRESHOLD and not suspended:
+        auto_suspend_citizen(report["citizen_id"], citizen, count, timestamp)
+        suspended = True
     return respond(200, {"citizen": {"citizen_id": report["citizen_id"], "username": citizen.get("username"),
                                      "flag_count": count, "threshold": FLAG_THRESHOLD,
                                      "suspension_eligible": count >= FLAG_THRESHOLD,
-                                     "is_suspended": is_true(citizen.get("is_suspended"))}})
+                                     "is_suspended": suspended}})
 
 
 def summary(citizen: dict) -> dict:

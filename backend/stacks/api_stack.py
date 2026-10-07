@@ -59,6 +59,7 @@ class ApiStack(Stack):
             tables[name].grant_read_write_data(submit)
         bucket.grant_read_write(submit)
         data.guest_token_secret.grant_read(submit)  # to check the token on a guest claim
+        tables["employees"].grant_read_data(submit)  # auto-assignment reads the roster (Item 2)
 
         report_list = function("report_list", memory=512)
         tables["reports"].grant_read_data(report_list)
@@ -82,6 +83,7 @@ class ApiStack(Stack):
 
         employee_admin = function("employee_admin")
         tables["employees"].grant_read_write_data(employee_admin)
+        tables["reports"].grant_read_write_data(employee_admin)  # drain pending reports to a new hire (Items 2 & 4)
 
         public = function("public_info")
         tables["reports"].grant_read_data(public)
@@ -148,6 +150,7 @@ class ApiStack(Stack):
             ("POST", "reports", submit, signed_in),
             ("GET", "reports", report_list, signed_in),
             ("GET", "reports/me", report_list, signed_in),
+            ("GET", "reports/unassigned", report_list, signed_in),   # Item 4: admin's not-assigned queue
             ("GET", "reports/{report_id}", detail, signed_in),
             ("PATCH", "reports/{report_id}/status", status, signed_in),
             ("POST", "reports/{report_id}/flag", flag, signed_in),

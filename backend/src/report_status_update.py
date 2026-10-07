@@ -16,6 +16,10 @@ def handler(event, context):
     if not report:
         raise ApiError(404, "NOT_FOUND", msg("not_found", who.lang))
 
+    # An employee may only change the status of a report assigned to them (Item 2).
+    if who.id not in (report.get("assigned_to") or []):
+        raise ApiError(403, "NOT_ASSIGNED", "You can only update reports assigned to you.")
+
     current = report["status"]
     if data.get("expected_current") and data["expected_current"] != current:
         raise ApiError(409, "STALE_STATE", "This report was updated by someone else. Refresh and try again.")

@@ -147,8 +147,9 @@ class Caller:
         return self.role in ("Admin", "Employee")
 
     def allowed(self, *roles: str) -> bool:
-        # An Admin can do anything an Employee can.
-        return self.role in roles or (self.role == "Admin" and "Employee" in roles)
+        # Admin is a distinct user, not a super-employee: it only matches when
+        # "Admin" is explicitly in the allowed roles for a route.
+        return self.role in roles
 
 
 def caller(event, *roles: str) -> Caller:

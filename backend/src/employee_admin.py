@@ -9,10 +9,13 @@ import re
 import secrets
 import string
 
+from decimal import Decimal
+
 from botocore.exceptions import ClientError
 
-from common import (ApiError, Key, api, body, caller, client, decode_cursor, encode_cursor, logger, now, page_size,
-                    path_param, plain, query, respond, table, text)
+from assignment import active_employees, choose_assignees, pending_unassigned_in
+from common import (IN_PROGRESS, PENDING, ApiError, Key, api, body, caller, client, conditional_failed, decode_cursor,
+                    encode_cursor, logger, now, page_size, path_param, plain, query, respond, table, text)
 
 EMAIL_PATTERN = r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$"
 # Symbols that read clearly in an email and need no escaping in HTML.
@@ -35,13 +38,73 @@ def cognito_failure(step: str, exc: ClientError) -> ApiError:
     return ApiError(502, "COGNITO_ERROR", f"Cognito could not {step}: {error.get('Code')}: {error.get('Message')}")
 
 
+def parse_zones(data) -> list[str]:
+    """The quarters an employee covers; at least one is required for auto-assignment."""
+    raw = data.get("zones")
+    if not isinstance(raw, list):
+        raise ApiError(400, "INVALID_FIELD", "Select at least one coverage zone.", {"field": "zones"})
+    zones, seen = [], set()
+    for z in raw:
+        name = text(z, "zone", 80)
+        if name.lower() not in seen:
+            seen.add(name.lower())
+            zones.append(name)
+    if not zones:
+        raise ApiError(400, "MISSING_FIELD", "Select at least one coverage zone.", {"field": "zones"})
+    return zones
+
+
+def parse_base(data) -> tuple[Decimal | None, Decimal | None]:
+    """Optional base point used to break ties between employees covering the same quarter."""
+    lat, lng = data.get("base_lat"), data.get("base_lng")
+    if lat in (None, "") or lng in (None, ""):
+        return None, None
+    try:
+        return Decimal(str(round(float(lat), 6))), Decimal(str(round(float(lng), 6)))
+    except (TypeError, ValueError):
+        raise ApiError(400, "INVALID_COORDINATES", "The base coordinates are not valid.")
+
+
+def drain_pending(employee: dict) -> None:
+    """A new employee immediately picks up pending reports in their zones that no one covered (Items 2 & 4)."""
+    zones = set(employee.get("zones") or [])
+    if not zones:
+        return
+    pool, stamp = active_employees(), now()
+    for report in pending_unassigned_in(zones):
+        try:
+            lat, lng = float(report["latitude"]), float(report["longitude"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        assignees = choose_assignees(report.get("quarter"), report.get("category"), lat, lng, pool=pool)
+        if not assignees:
+            continue
+        entry = {"status": IN_PROGRESS, "at": stamp, "by": "system", "by_role": "System", "note": "Auto-assigned"}
+        try:
+            table("reports").update_item(
+                Key={"report_id": report["report_id"]},
+                UpdateExpression=("SET assigned_to = :ids, assigned_names = :names, assigned_at = :now, "
+                                  "#s = :inprog, updated_at = :now, "
+                                  "status_history = list_append(status_history, :h)"),
+                ConditionExpression="attribute_not_exists(assigned_to) AND #s = :pending",
+                ExpressionAttributeNames={"#s": "status"},
+                ExpressionAttributeValues={":ids": [e["employee_id"] for e in assignees],
+                                           ":names": [e.get("name") or e["employee_id"] for e in assignees],
+                                           ":now": stamp, ":inprog": IN_PROGRESS, ":pending": PENDING, ":h": [entry]})
+        except ClientError as exc:
+            if not conditional_failed(exc):
+                raise
+
+
 def create(event, who):
     data = body(event)
     name = text(data.get("name"), "name", 100)
     email = text(data.get("email"), "email", 254).lower()
     if not re.match(EMAIL_PATTERN, email):
         raise ApiError(400, "INVALID_EMAIL", "Enter a valid email address.", {"field": "email"})
-    location = text(data.get("location"), "location", 100)
+    zones = parse_zones(data)
+    base_lat, base_lng = parse_base(data)
+    location = text(data.get("location"), "location", 100, required=False) or ", ".join(zones)
     language = "fr" if data.get("language") == "fr" else "en"
     if table("employees").query(IndexName="GSI-email", KeyConditionExpression=Key("email").eq(email), Limit=1)["Items"]:
         raise ApiError(409, "EMAIL_EXISTS", "An account with that email address already exists.")
@@ -72,11 +135,15 @@ def create(event, who):
     employee = {
         "employee_id": next(a["Value"] for a in user["Attributes"] if a["Name"] == "sub"),
         "cognito_username": user["Username"], "name": name, "email": email, "location": location,
+        "zones": zones,
         "language": language, "is_active": True, "created_by": who.id, "created_by_username": who.username,
         "created_at": now(),
     }
+    if base_lat is not None:
+        employee["base_lat"], employee["base_lng"] = base_lat, base_lng
     table("employees").put_item(Item=employee)
-    return respond(201, {"employee": employee})
+    drain_pending(employee)  # take over any unassigned reports now that this zone is covered
+    return respond(201, {"employee": plain(employee)})
 
 
 def list_employees(event):

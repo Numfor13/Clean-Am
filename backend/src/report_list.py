@@ -4,7 +4,7 @@ GET /reports/me   citizen: their own reports
 """
 from boto3.dynamodb.conditions import Attr
 
-from common import Key, api, caller, decode_cursor, encode_cursor, page_size, query, respond, status_value, table, text, with_photo
+from common import PENDING, Key, api, caller, decode_cursor, encode_cursor, page_size, query, respond, status_value, table, text, with_photo
 
 # Fields a citizen never sees on their own reports.
 MODERATION_FIELDS = ("is_fraudulent", "flag_count", "flagged_by", "flag_reason", "status_history")
@@ -103,8 +103,23 @@ def all_reports(event):
     return respond(200, page(operation, **kwargs))
 
 
+def unassigned_reports(event):
+    """Admin only: PENDING reports no employee covers — the "not assigned to anyone" queue (Item 4)."""
+    caller(event, "Admin")
+    params = query(event)
+    kwargs = {"IndexName": "GSI-status", "KeyConditionExpression": Key("status").eq(PENDING),
+              "ScanIndexForward": params.get("sort") == "oldest", "Limit": page_size(params),
+              "FilterExpression": Attr("assigned_to").not_exists()}
+    if params.get("cursor"):
+        kwargs["ExclusiveStartKey"] = decode_cursor(params["cursor"])
+    return respond(200, page(table("reports").query, **kwargs))
+
+
 @api
 def handler(event, context):
-    if event.get("resource") == "/reports/me":
+    resource = event.get("resource")
+    if resource == "/reports/me":
         return my_reports(event)
+    if resource == "/reports/unassigned":
+        return unassigned_reports(event)
     return all_reports(event)

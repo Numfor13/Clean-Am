@@ -4,7 +4,7 @@ from common import ApiError, Key, api, caller, is_true, msg, path_param, plain, 
 
 @api
 def handler(event, context):
-    who = caller(event, "Citizen", "Employee")
+    who = caller(event, "Citizen", "Employee", "Admin")
     item = table("reports").get_item(Key={"report_id": path_param(event, "report_id")}).get("Item")
     # 404 rather than 403 for someone else's report: IDs reveal nothing.
     if not item or not (who.is_staff or item["citizen_id"] == who.id):
@@ -17,6 +17,9 @@ def handler(event, context):
         # Citizens see when their report moved, not who moved it.
         report["status_history"] = [{"status": h["status"], "at": h["at"]} for h in report.get("status_history", [])]
         return respond(200, {"report": report})
+
+    # An employee may only act on reports assigned to them (Item 2).
+    report["assigned_to_me"] = who.role == "Employee" and who.id in (item.get("assigned_to") or [])
 
     if item.get("reporter_type") == "guest":
         guest = table("guests").get_item(Key={"guest_id": item["guest_id"]}).get("Item") or {}
