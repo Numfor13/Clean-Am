@@ -7,7 +7,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { callBackend, currentIdToken } from "@/server/backend";
-import { COOKIE } from "@/server/session";
+import { clearTokens, COOKIE } from "@/server/session";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +49,10 @@ async function handle(request: NextRequest, context: Context): Promise<NextRespo
   } else if (!path.startsWith("public/")) {
     const idToken = await currentIdToken(store);
     if (!idToken) {
+      // The session cannot be refreshed. Drop its cookies too: left in place,
+      // the route guard would still count this browser as signed in and send
+      // it from /login straight back home, a loop the person cannot leave.
+      clearTokens(store);
       return NextResponse.json(
         { error: { code: "UNAUTHORIZED", message: "Your session has ended. Please sign in again." } },
         { status: 401 },
@@ -87,6 +91,11 @@ async function handle(request: NextRequest, context: Context): Promise<NextRespo
       { error: { code: "GUEST_SESSION_EXPIRED", message: "Your guest session has expired. Please try again." } },
       { status: 401, headers: { "Cache-Control": "no-store" } },
     );
+  }
+  if (auth?.kind === "user" && result.status === 401) {
+    // API Gateway rejected the token (revoked, wrong pool, expired refresh):
+    // the session is over, so clear it for the same reason as above.
+    clearTokens(store);
   }
   return NextResponse.json(result.body, { status: result.status, headers: { "Cache-Control": "no-store" } });
 }
