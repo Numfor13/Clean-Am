@@ -914,3 +914,57 @@ a.logo:hover .logo__mark {
     padding-right: var(--s8);
   }
 }
+
+/* ================================================================
+   Tablets and larger: the navigation bar becomes a navigation rail
+   (M3: bar on compact screens, rail on medium and expanded ones).
+   ================================================================ */
+@media (min-width: 768px) {
+  .tabbar {
+    top: 0;
+    right: auto;
+    bottom: 0;
+    width: 104px;
+    display: flex;
+    align-items: center;
+    padding: var(--s3);
+  }
+
+  .tabbar__inner {
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--s4);
+    width: 80px;
+    max-width: none;
+    height: auto;
+    margin: 0;
+    padding: var(--s5) 0;
+  }
+
+  .tab {
+    flex: 0 0 auto;
+    width: 100%;
+    font-size: 12px;
+  }
+
+  /* Make room for the rail beside every screen that has it. */
+  body:has(.tabbar) {
+    padding-left: 104px;
+  }
+
+  body:has(.tabbar) .m-screen--tabs,
+  body:has(.tabbar) .m-screen--tabs-cta {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  }
+
+  /* The submit bar sits at the bottom, beside the rail. */
+  body:has(.tabbar) .action-bar:not(.action-bar--bottom) {
+    left: 104px;
+    bottom: 0;
+    padding-bottom: calc(var(--s4) + env(safe-area-inset-bottom));
+  }
+
+  body:has(.tabbar) .toast-region {
+    bottom: var(--s6);
+  }
+}
