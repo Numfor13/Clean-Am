@@ -6,11 +6,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiRequestError } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { formatDate, formatDateTime, initials, maskPhone } from "@/lib/format";
-import { CITIES, FLAG_REASON_KEY, FLAG_THRESHOLD } from "@/lib/reports";
-import type { Employee, Flag as FlagRecord, FlaggedCitizen, Lang } from "@/lib/types";
+import { CITIES, DEFAULT_CITY, FLAG_REASON_KEY, FLAG_THRESHOLD } from "@/lib/reports";
+import type { Employee, Flag as FlagRecord, FlaggedCitizen, Lang, Report, ReportPage } from "@/lib/types";
 import { Dialog, useToast } from "@/components/shell";
 import { LanguageToggle, TextField } from "@/components/forms";
-import { Ban, ChevronLeft, ChevronRight, PlusCircle, Refresh, Search, User, UserRound, UserX, Users, Warning, Flag } from "@/components/icons";
+import { ReportCard } from "@/components/reports";
+import { Ban, Check, ChevronLeft, ChevronRight, CheckCircle, PlusCircle, Refresh, Search, User, UserRound, UserX, Users, Warning, Flag } from "@/components/icons";
 import { EmptyState, ErrorState, FieldError, Skeleton } from "@/components/ui";
 
 // ===========================================================================
@@ -106,7 +107,7 @@ export function EmployeesScreen() {
         <>
           <div className="table-card">
             <div className="table-scroll">
-              <table className="table">
+              <table className="table table--stack">
                 <thead>
                   <tr>
                     <th>{t("admin.col.name")}</th>
@@ -140,15 +141,15 @@ export function EmployeesScreen() {
                               </span>
                             </span>
                           </td>
-                          <td>{e.email}</td>
-                          <td>{e.location}</td>
-                          <td className="nowrap">{formatDate(e.created_at, lang)}</td>
-                          <td>
+                          <td data-label={t("field.emailTitle")}>{e.email}</td>
+                          <td data-label={t("admin.col.location")}>{e.location}</td>
+                          <td className="nowrap" data-label={t("admin.col.created")}>{formatDate(e.created_at, lang)}</td>
+                          <td data-label={t("staff.status")}>
                             <span className={`chip ${e.is_active ? "chip--active" : "chip--muted"}`}>
                               {e.is_active ? t("admin.active") : t("admin.revokedChip")}
                             </span>
                           </td>
-                          <td>
+                          <td data-label={t("admin.col.action")}>
                             {e.is_active ? (
                               <button type="button" className="btn btn--ghost btn--sm text-danger" style={{ color: "var(--flagged-ink)" }} onClick={() => setRevoking(e)}>
                                 <UserX aria-hidden="true" />
@@ -219,29 +220,52 @@ export function EmployeesScreen() {
 // ===========================================================================
 // Create employee
 // ===========================================================================
+// Every known quarter's point, so an employee's base can be the centroid of
+// the zones they cover (used to break assignment ties — Item 2).
+const QUARTER_POINTS: Record<string, { lat: number; lng: number }> = Object.fromEntries(
+  Object.values(CITIES).flat().map((q) => [q.name, { lat: q.lat, lng: q.lng }]),
+);
+
+function centroidOf(zones: string[]): { lat: number; lng: number } | null {
+  const pts = zones.map((z) => QUARTER_POINTS[z]).filter(Boolean) as { lat: number; lng: number }[];
+  if (!pts.length) return null;
+  const lat = pts.reduce((s, p) => s + p.lat, 0) / pts.length;
+  const lng = pts.reduce((s, p) => s + p.lng, 0) / pts.length;
+  return { lat: Number(lat.toFixed(6)), lng: Number(lng.toFixed(6)) };
+}
+
 export function CreateEmployeeScreen() {
   const { t } = useT();
   const toast = useToast();
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [location, setLocation] = useState(CITIES.Buea[0].name);
+  const [zones, setZones] = useState<string[]>([]);
+  const [zoneCity, setZoneCity] = useState<string>(DEFAULT_CITY);
   const [language, setLanguage] = useState<Lang>("en");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const toggleZone = (name: string) =>
+    setZones((zs) => (zs.includes(name) ? zs.filter((z) => z !== name) : [...zs, name]));
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const found: Record<string, string> = {};
     if (name.trim().length < 2) found.name = t("admin.error.name");
     if (!/^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$/.test(email.trim())) found.email = t("auth.error.INVALID_EMAIL");
+    if (!zones.length) found.zones = t("admin.error.zones");
     setErrors(found);
     if (Object.keys(found).length) return;
     setBusy(true);
     setError(null);
     try {
-      await api.post("employees", { name: name.trim(), email: email.trim().toLowerCase(), location, language });
+      const base = centroidOf(zones);
+      await api.post("employees", {
+        name: name.trim(), email: email.trim().toLowerCase(), zones, language,
+        ...(base ? { base_lat: base.lat, base_lng: base.lng } : {}),
+      });
       toast(t("admin.created", { email: email.trim().toLowerCase() }));
       router.push("/admin/employees");
     } catch (err) {
@@ -253,8 +277,8 @@ export function CreateEmployeeScreen() {
 
   return (
     <form className="card form-card stack" style={{ "--gap": "22px", marginTop: 16 } as React.CSSProperties} onSubmit={submit} noValidate>
-      <div className="row" style={{ "--gap": "18px", alignItems: "flex-start" } as React.CSSProperties}>
-        <span className="icon-disc" style={{ "--size": "72px" } as React.CSSProperties}>
+      <div className="security-head">
+        <span className="icon-disc">
           <UserRound aria-hidden="true" />
         </span>
         <div>
@@ -276,21 +300,41 @@ export function CreateEmployeeScreen() {
         error={errors.email}
       />
       <div className="field">
-        <label className="label" htmlFor="emp-location">
-          {t("admin.col.location")}
-        </label>
-        <select id="emp-location" className="select" value={location} onChange={(e) => setLocation(e.target.value)}>
-          {Object.entries(CITIES).map(([city, quarters]) => (
-            <optgroup key={city} label={city}>
-              {quarters.map((q) => (
-                <option key={`${city}-${q.name}`} value={q.name}>
-                  {q.name}
-                </option>
-              ))}
-            </optgroup>
+        <span className="label">{t("admin.zones")}</span>
+        <p className="help" style={{ marginTop: 0 }}>{t("admin.zonesHelp")}</p>
+        <select
+          id="emp-zone-city"
+          className="select"
+          value={zoneCity}
+          onChange={(e) => setZoneCity(e.target.value)}
+          aria-label={t("admin.col.location")}
+        >
+          {Object.keys(CITIES).map((city) => (
+            <option key={city} value={city}>
+              {city}
+            </option>
           ))}
         </select>
-        <p className="help">{t("admin.locationHelp")}</p>
+        <div
+          role="group"
+          aria-label={t("admin.zones")}
+          className="cat-grid"
+          style={{ marginTop: 10 }}
+        >
+          {CITIES[zoneCity].map((q) => {
+            const on = zones.includes(q.name);
+            return (
+              <button type="button" key={q.name} className="filter-chip" aria-pressed={on} onClick={() => toggleZone(q.name)}>
+                {on ? <Check aria-hidden="true" size={16} /> : null}
+                {q.name}
+              </button>
+            );
+          })}
+        </div>
+        {zones.length ? (
+          <p className="help">{t("admin.zonesSelected", { count: zones.length, zones: zones.join(", ") })}</p>
+        ) : null}
+        <FieldError>{errors.zones}</FieldError>
       </div>
       <div className="field">
         <span className="label">{t("field.languageTitle")}</span>
@@ -411,7 +455,7 @@ export function FlaggedCitizensScreen() {
             <EmptyState icon={<Flag aria-hidden="true" />} title={search ? t("admin.noMatch") : t("admin.noFlagged")} />
           ) : (
             <div className="table-scroll">
-              <table className="table">
+              <table className="table table--stack">
                 <thead>
                   <tr>
                     <th>{t("admin.col.username")}</th>
@@ -440,12 +484,12 @@ export function FlaggedCitizensScreen() {
                           <span className="strong">{c.username}</span>
                         </span>
                       </td>
-                      <td className="nowrap">{maskPhone(c.phone_number) || "—"}</td>
-                      <td>
+                      <td className="nowrap" data-label={t("field.phoneTitle")}>{maskPhone(c.phone_number) || "—"}</td>
+                      <td data-label={t("admin.col.flags")}>
                         <span className="count-badge">{c.flag_count}</span>
                       </td>
-                      <td>{c.report_count ?? "—"}</td>
-                      <td>
+                      <td data-label={t("admin.col.reports")}>{c.report_count ?? "—"}</td>
+                      <td data-label={t("staff.status")}>
                         <span className={`chip ${c.is_suspended ? "chip--suspended" : "chip--active"}`}>
                           {c.is_suspended ? t("admin.suspendedChip") : t("admin.active")}
                         </span>
@@ -646,5 +690,63 @@ function ModerationDialog({
         </div>
       </div>
     </Dialog>
+  );
+}
+
+// ===========================================================================
+// Unassigned reports (Item 4): reports no employee covers, shown to the admin
+// so they can create staff for those zones. The queue is derived server-side
+// (PENDING with no assignee), so there is no notifications table to maintain.
+// ===========================================================================
+export function UnassignedScreen() {
+  const { t } = useT();
+  const [reports, setReports] = useState<Report[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      const r = await api.get<ReportPage>("reports/unassigned");
+      setReports(r.reports);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t("common.error"));
+    }
+  }, [t]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return (
+    <div className="stack" style={{ "--gap": "18px" } as React.CSSProperties}>
+      <div className="page-head" style={{ marginBottom: 0 }}>
+        <div>
+          <h1 className="page-title">{t("admin.unassignedTitle")}</h1>
+          <p className="page-sub">{t("admin.unassignedSub")}</p>
+        </div>
+      </div>
+      {error ? (
+        <ErrorState message={error} onRetry={load} />
+      ) : reports === null ? (
+        <div className="stack" style={{ "--gap": "12px" } as React.CSSProperties}>
+          <Skeleton height={96} radius={12} />
+          <Skeleton height={96} radius={12} />
+        </div>
+      ) : reports.length === 0 ? (
+        <EmptyState icon={<CheckCircle aria-hidden="true" />} title={t("admin.unassignedNoneTitle")} body={t("admin.unassignedNone")} />
+      ) : (
+        <>
+          <div className="banner banner--warning" role="status" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Warning aria-hidden="true" />
+            <span>{t("admin.unassignedBanner", { count: reports.length })}</span>
+          </div>
+          <div className="report-grid">
+            {reports.map((r) => (
+              <ReportCard key={r.report_id} report={r} href={`/staff/reports/${r.report_id}`} showReporter />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   );
 }

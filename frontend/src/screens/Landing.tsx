@@ -2,18 +2,20 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import { api } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { formatNumber } from "@/lib/format";
-import type { PublicStats } from "@/lib/types";
+import { springDefault, springFast } from "@/lib/motion";
+import type { PublicStats, ReportStatus } from "@/lib/types";
 import { PublicFooter, PublicHeader } from "@/components/public";
 import { InstallCard } from "@/components/pwa";
 import { ParallaxSection } from "@/components/ParallaxSection";
+import { Reveal } from "@/components/Reveal";
 import {
   ArrowRight,
   CalendarDays,
   Camera,
-  ChevronRight,
   Clock,
   Globe,
   Leaf,
@@ -23,8 +25,6 @@ import {
   Trash,
   Truck,
   Users,
-  CheckCircle,
-  Zap,
 } from "@/components/icons";
 
 export function usePublicStats() {
@@ -62,16 +62,13 @@ export function Leaves({ side }: { side: "left" | "right" }) {
 export function LandingScreen() {
   const { t, lang } = useT();
   const stats = usePublicStats();
+  const rate = stats?.resolution_rate == null ? null : Math.round(stats.resolution_rate);
 
-  const statTiles = [
-    { icon: Users, value: formatNumber(stats?.reports_total, lang), label: t("landing.stat.reports") },
-    { icon: CheckCircle, value: formatNumber(stats?.reports_resolved, lang), label: t("landing.stat.resolved") },
-    {
-      icon: ShieldCheck,
-      value: stats?.resolution_rate == null ? "—" : `${Math.round(stats.resolution_rate)}%`,
-      label: t("landing.stat.rate"),
-    },
-    { icon: Zap, value: formatNumber(stats?.reports_in_progress, lang), label: t("landing.stat.inProgress") },
+  const features = [
+    { icon: Users, title: t("landing.pill.free"), body: t("landing.pill.free.body") },
+    { icon: ShieldCheck, title: t("landing.pill.verified"), body: t("landing.pill.verified.body") },
+    { icon: Clock, title: t("landing.pill.tracking"), body: t("landing.pill.tracking.body") },
+    { icon: Globe, title: t("landing.pill.bilingual"), body: t("landing.pill.bilingual.body") },
   ];
 
   const services = [
@@ -87,110 +84,141 @@ export function LandingScreen() {
     <>
       <PublicHeader />
       <main id="main">
-        {/* ---------------- Hero ---------------- */}
-        <section className="hero on-deep" id="top">
-          <Leaves side="left" />
-          <div className="hero__grid container">
-            <div className="hero__copy">
-              <span className="eyebrow-pill">
-                <Leaf aria-hidden="true" />
-                {t("landing.eyebrow")}
-              </span>
-              <h1 className="hero__title">
-                {t("landing.title1")} <span className="accent">{t("landing.title2")}</span>
-              </h1>
-              <p className="hero__lead">{t("landing.lead")}</p>
-              <div className="hero__ctas">
-                <Link href="/report" className="btn btn--primary btn--lg">
-                  {t("landing.cta")}
-                  <ArrowRight aria-hidden="true" />
-                </Link>
-                <Link href="/#services" className="btn btn--on-deep btn--lg">
-                  {t("landing.ourServices")}
-                  <ArrowRight aria-hidden="true" className="desktop-only" />
-                </Link>
-              </div>
-              <ul className="feature-pills">
-                <li>
-                  <Users aria-hidden="true" />
-                  {t("landing.pill.free")}
-                </li>
-                <li>
-                  <ShieldCheck aria-hidden="true" />
-                  {t("landing.pill.verified")}
-                </li>
-                <li>
-                  <Clock aria-hidden="true" />
-                  {t("landing.pill.tracking")}
-                </li>
-                <li>
-                  <Globe aria-hidden="true" />
-                  {t("landing.pill.bilingual")}
-                </li>
-              </ul>
-            </div>
-            <div className="hero__photo">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/hero-crew.jpg" alt={t("landing.heroAlt")} />
+        {/* ---------------- Bento hero ---------------- */}
+        <section className="bento container" id="top" aria-labelledby="hero-title">
+          <div className="enter tile bento__intro" style={{ "--d": "0ms" } as React.CSSProperties}>
+            <span className="eyebrow-chip">
+              <span className="live-dot" aria-hidden="true" />
+              {t("landing.eyebrow")}
+            </span>
+            <h1 id="hero-title" className="hero__title">
+              {t("landing.title1")} <span className="accent">{t("landing.title2")}</span>
+            </h1>
+            <p className="hero__lead">{t("landing.lead")}</p>
+            <div className="hero__ctas">
+              <Link href="/report" className="btn btn--primary btn--lg">
+                <Camera aria-hidden="true" />
+                {t("landing.cta")}
+              </Link>
+              <Link href="/#services" className="btn btn--tonal btn--lg">
+                {t("landing.ourServices")}
+                <ArrowRight aria-hidden="true" />
+              </Link>
             </div>
           </div>
-        </section>
 
-        {/* ---------------- Live stats ---------------- */}
-        <div className="container">
-          <section className="stat-bar" aria-label={t("landing.stat.label")}>
-            {statTiles.map(({ icon: Icon, value, label }) => (
-              <div className="stat-tile" key={label}>
-                <span className="icon-disc icon-disc--deep" style={{ "--size": "64px" } as React.CSSProperties}>
+          <div className="enter tile tile--media bento__photo" style={{ "--d": "60ms" } as React.CSSProperties}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/hero-crew.jpg" alt={t("landing.heroAlt")} />
+            <span className="float-chip">
+              <span className="live-dot" aria-hidden="true" />
+              <strong>{formatNumber(stats?.reports_in_progress, lang)}</strong> {t("landing.stat.inProgress")}
+            </span>
+          </div>
+
+          <div className="enter tile bento__network" style={{ "--d": "120ms" } as React.CSSProperties}>
+            <span className="eyebrow-mono">{t("landing.network")}</span>
+            <div className="avatar-stack" aria-hidden="true">
+              <span className="avatar">
+                <Camera size={18} />
+              </span>
+              <span className="avatar">
+                <MapPin size={18} />
+              </span>
+              <span className="avatar">
+                <Truck size={18} />
+              </span>
+              <span className="avatar avatar-stack__count">{formatNumber(stats?.reports_total, lang)}</span>
+            </div>
+            <p>{t("landing.networkBody", { count: formatNumber(stats?.reports_total, lang) })}</p>
+          </div>
+
+          <div className="enter tile bento__rate" style={{ "--d": "160ms" } as React.CSSProperties}>
+            <span className="bento__big">
+              {rate === null ? "—" : rate}
+              {rate === null ? null : <small>%</small>}
+            </span>
+            <span className="bento__big-label">
+              <strong>{t("landing.stat.rate")}</strong>
+              <span>{t("landing.rateNote")}</span>
+            </span>
+          </div>
+
+          <div className="enter tile tile--media bento__band" style={{ "--d": "200ms" } as React.CSSProperties}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/commitment.jpg" alt={t("landing.commitAlt")} />
+            <div className="bento__band-copy">
+              <span className="bento__band-title">{t("landing.commitTitle1")}</span>
+              <Link href="/register" className="btn btn--primary btn--sm">
+                <Leaf aria-hidden="true" />
+                {t("landing.join")}
+              </Link>
+            </div>
+          </div>
+
+          <div className="bento__features">
+            {features.map(({ icon: Icon, title, body }, i) => (
+              <div key={title} className="enter tile feature-tile" style={{ "--d": `${100 + i * 50}ms` } as React.CSSProperties}>
+                <span className="feature-tile__icon">
                   <Icon aria-hidden="true" />
                 </span>
-                <div>
-                  <div className="stat-tile__value">{value}</div>
-                  <div className="stat-tile__label">{label}</div>
-                </div>
+                <span className="feature-tile__title">{title}</span>
+                <span className="feature-tile__body">{body}</span>
               </div>
             ))}
-          </section>
-        </div>
+          </div>
+        </section>
 
         <div className="container install-slot">
           <InstallCard />
         </div>
 
+        {/* ---------------- Live dashboard ---------------- */}
+        <section className="container section" aria-labelledby="dash-title">
+          <Reveal className="tile dash" dir="up">
+            <LiveDashboard stats={stats} />
+          </Reveal>
+        </section>
+
         {/* ---------------- Services ---------------- */}
         <section className="section container" id="services" aria-labelledby="services-title">
-          <div className="section-head">
-            <span className="badge-mint">{t("landing.why")}</span>
+          <Reveal className="section-head" dir="up">
+            <span className="eyebrow-mono">{t("landing.why")}</span>
             <h2 id="services-title" className="display-l">
-              {t("landing.servicesTitle1")}
-              <br />
-              <span className="text-brand">{t("landing.servicesTitle2")}</span>
+              {t("landing.servicesTitle1")} <span className="text-brand">{t("landing.servicesTitle2")}</span>
             </h2>
             <p className="body-l">{t("landing.servicesLead")}</p>
-          </div>
+          </Reveal>
           <div className="service-grid">
-            {services.map(({ icon: Icon, title, body, href, soon }) => {
+            {services.map(({ icon: Icon, title, body, href, soon }, i) => {
               const inner = (
                 <>
-                  <span className={`icon-disc ${soon ? "icon-disc--muted" : "icon-disc--deep"}`} style={{ "--size": "64px" } as React.CSSProperties}>
+                  <span className={`icon-disc ${soon ? "icon-disc--muted" : ""}`} style={{ "--size": "56px" } as React.CSSProperties}>
                     <Icon aria-hidden="true" />
                   </span>
                   <span className="service-card__text">
                     <span className="service-card__title">{title}</span>
                     <span className="service-card__body">{body}</span>
-                    {soon ? <span className="soon-pill">{t("common.comingSoon")}</span> : null}
                   </span>
-                  {soon ? null : <ChevronRight aria-hidden="true" className="service-card__chev" />}
+                  {soon ? (
+                    <span className="soon-pill">{t("common.comingSoon")}</span>
+                  ) : (
+                    <span className="service-card__go" aria-hidden="true">
+                      <ArrowRight />
+                    </span>
+                  )}
                 </>
               );
-              return soon ? (
-                <div className="service-card is-soon" key={title}>
-                  {inner}
-                </div>
-              ) : (
-                <Link className="service-card" href={href!} key={title}>
-                  {inner}
-                </Link>
+              return (
+                <Reveal key={title} dir="up" delay={(i % 3) * 0.06}>
+                  {soon ? (
+                    <div className="service-card is-soon">{inner}</div>
+                  ) : (
+                    <Link className="service-card" href={href!}>
+                      {inner}
+                    </Link>
+                  )}
+                </Reveal>
               );
             })}
           </div>
@@ -198,101 +226,208 @@ export function LandingScreen() {
 
         {/* ---------------- How it works ---------------- */}
         <section className="section container" id="how" aria-labelledby="how-title">
-          <div className="section-head">
-            <h2 id="how-title" className="display-m">
+          <Reveal className="section-head" dir="up">
+            <span className="eyebrow-mono">{t("nav.reportGuide")}</span>
+            <h2 id="how-title" className="display-l">
               {t("how.title")}
             </h2>
             <p className="body-l">{t("how.lead")}</p>
-          </div>
+          </Reveal>
           <HowItWorks />
         </section>
 
-        {/* ---------------- Parallax Showcase Section ---------------- */}
-        <ParallaxSection
-          bgImage="/images/hero-crew.jpg"
-          bgAlt="Municipal waste management in action"
-          bleedPercent={35}
-          bgSpeed={18}
-          fgShift={36}
-          minHeight="540px"
-          className="showcase-parallax on-deep"
-        >
-          <div className="container" style={{ textAlign: "center", padding: "80px 24px" }}>
-            <span
-              className="eyebrow-pill"
-              style={{
-                background: "rgba(201, 247, 221, 0.16)",
-                color: "#c9f7dd",
-                border: "1px solid rgba(201, 247, 221, 0.3)",
-                backdropFilter: "blur(10px)",
-                margin: "0 auto 20px",
-              }}
-            >
-              <Leaf aria-hidden="true" />
-              Empowered Action · High Performance
-            </span>
-            <h2 className="display-l" style={{ color: "#ffffff", maxWidth: "800px", margin: "0 auto 18px", fontSize: "clamp(2rem, 4vw, 3.2rem)", lineHeight: 1.15 }}>
-              Clean Streets. Rapid Response. <span className="accent">Measurable Impact.</span>
-            </h2>
-            <p className="body-l" style={{ color: "rgba(255, 255, 255, 0.88)", maxWidth: "660px", margin: "0 auto 36px", fontSize: "clamp(1.05rem, 1.8vw, 1.25rem)" }}>
-              Every citizen photo is directly routed to dispatch crews in real time. Experience transparent municipal hygiene with zero delays.
-            </p>
-            <div style={{ display: "flex", gap: "16px", justifyContent: "center", flexWrap: "wrap", alignItems: "center" }}>
-              <Link href="/report" className="btn btn--primary btn--lg" style={{ boxShadow: "0 8px 24px rgba(42, 148, 87, 0.35)" }}>
-                <Camera aria-hidden="true" />
-                {t("home.cta")}
-              </Link>
-              <Link
-                href="/register"
-                className="btn btn--lg"
-                style={{
-                  background: "rgba(255, 255, 255, 0.12)",
-                  color: "#ffffff",
-                  border: "1px solid rgba(255, 255, 255, 0.28)",
-                  backdropFilter: "blur(12px)",
-                }}
-              >
-                {t("landing.join")}
-                <ArrowRight aria-hidden="true" />
-              </Link>
-            </div>
-          </div>
-        </ParallaxSection>
-
-        {/* ---------------- Commitment ---------------- */}
-        <section className="commitment on-deep" id="about" aria-labelledby="about-title">
-          <Leaves side="left" />
-          <Leaves side="right" />
-          <div className="commitment__grid container">
-            <div className="commitment__copy">
-              <span className="badge-amber">{t("landing.commitment")}</span>
-              <h2 id="about-title" className="display-l" style={{ color: "#fff" }}>
-                {t("landing.commitTitle1")}
-                <br />
-                <span className="accent">{t("landing.commitTitle2")}</span>
+        {/* ---------------- Parallax showcase ---------------- */}
+        <div className="container showcase-wrap">
+          <ParallaxSection
+            bgImage="/images/hero-crew.jpg"
+            bgAlt=""
+            bleedPercent={35}
+            bgSpeed={14}
+            fgShift={28}
+            minHeight="500px"
+            className="showcase-parallax on-deep"
+          >
+            <div className="showcase">
+              <span className="eyebrow-chip eyebrow-chip--glass">
+                <Leaf aria-hidden="true" />
+                {t("landing.showcase.eyebrow")}
+              </span>
+              <h2 className="showcase__title">
+                {t("landing.showcase.title1")} <span className="accent">{t("landing.showcase.title2")}</span>
               </h2>
-              <p>{t("landing.commitBody")}</p>
-              <Link href="/register" className="btn btn--on-deep desktop-only" style={{ alignSelf: "flex-start" }}>
-                {t("landing.join")}
-                <ArrowRight aria-hidden="true" />
-              </Link>
-            </div>
-            <div className="commitment__photo">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/commitment.jpg" alt={t("landing.commitAlt")} />
-              <div className="trust-card">
-                <ShieldCheck aria-hidden="true" />
-                <span>{t("landing.trust")}</span>
+              <p className="showcase__body">{t("landing.showcase.body")}</p>
+              <div className="showcase__ctas">
+                <Link href="/report" className="btn btn--primary btn--lg">
+                  <Camera aria-hidden="true" />
+                  {t("home.cta")}
+                </Link>
+                <Link href="/register" className="btn btn--on-deep btn--lg">
+                  {t("landing.join")}
+                  <ArrowRight aria-hidden="true" />
+                </Link>
               </div>
             </div>
-            <Link href="/register" className="btn btn--block mobile-only commitment__cta">
-              {t("landing.join")}
-              <ArrowRight aria-hidden="true" />
-            </Link>
+          </ParallaxSection>
+        </div>
+
+        {/* ---------------- Commitment ---------------- */}
+        <section className="container section" id="about" aria-labelledby="about-title">
+          <div className="commitment on-deep">
+            <Leaves side="right" />
+            <div className="commitment__grid">
+              <Reveal className="commitment__copy" dir="left">
+                <span className="badge-amber">{t("landing.commitment")}</span>
+                <h2 id="about-title" className="display-l" style={{ color: "#fff" }}>
+                  {t("landing.commitTitle1")} <span className="accent">{t("landing.commitTitle2")}</span>
+                </h2>
+                <p>{t("landing.commitBody")}</p>
+                <Link href="/register" className="btn btn--primary btn--lg">
+                  {t("landing.join")}
+                  <ArrowRight aria-hidden="true" />
+                </Link>
+              </Reveal>
+              <Reveal className="commitment__photo" dir="right" delay={0.1}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/images/commitment.jpg" alt={t("landing.commitAlt")} />
+                <div className="trust-card">
+                  <ShieldCheck aria-hidden="true" />
+                  <span>{t("landing.trust")}</span>
+                </div>
+              </Reveal>
+            </div>
           </div>
         </section>
       </main>
       <PublicFooter />
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Live dashboard: the public figures, one status at a time. The tab
+// indicator slides between tabs on a shared-layout spring.
+// ---------------------------------------------------------------------------
+type DashTab = "ALL" | ReportStatus;
+
+function LiveDashboard({ stats }: { stats: PublicStats | null }) {
+  const { t, lang } = useT();
+  const reduce = useReducedMotion();
+  const [tab, setTab] = useState<DashTab>("ALL");
+
+  const total = stats?.reports_total ?? null;
+  const counts: Record<ReportStatus, number | null> = {
+    PENDING: stats?.reports_pending ?? null,
+    IN_PROGRESS: stats?.reports_in_progress ?? null,
+    DONE: stats?.reports_resolved ?? null,
+  };
+  const share = (n: number | null) => (n == null || !total ? 0 : Math.round((n / total) * 100));
+
+  const tabs: { id: DashTab; label: string }[] = [
+    { id: "ALL", label: t("landing.dash.overview") },
+    { id: "PENDING", label: t("status.PENDING") },
+    { id: "IN_PROGRESS", label: t("status.IN_PROGRESS") },
+    { id: "DONE", label: t("status.DONE") },
+  ];
+  const body: Record<ReportStatus, string> = {
+    PENDING: t("landing.dash.pendingBody"),
+    IN_PROGRESS: t("landing.dash.progressBody"),
+    DONE: t("landing.dash.doneBody"),
+  };
+  const statuses: ReportStatus[] = ["PENDING", "IN_PROGRESS", "DONE"];
+
+  return (
+    <>
+      <div className="dash__head">
+        <div className="stack" style={{ "--gap": "10px" } as React.CSSProperties}>
+          <span className="eyebrow-mono">{t("landing.dash.eyebrow")}</span>
+          <h2 id="dash-title" className="dash__title">
+            {t("landing.dash.title")}
+          </h2>
+        </div>
+        <p className="dash__note">{stats?.unavailable ? t("landing.dash.unavailable") : t("landing.dash.note")}</p>
+      </div>
+
+      <LayoutGroup id="dash-tabs">
+        <div className="tabs" role="tablist" aria-label={t("landing.stat.label")}>
+          {tabs.map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              id={`dash-tab-${id}`}
+              aria-selected={tab === id}
+              aria-controls="dash-panel"
+              className="tabs__tab"
+              onClick={() => setTab(id)}
+            >
+              {tab === id ? (
+                <motion.span className="tabs__indicator" layoutId="dash-indicator" transition={reduce ? { duration: 0 } : springFast} />
+              ) : null}
+              <span className="tabs__label">{label}</span>
+            </button>
+          ))}
+        </div>
+      </LayoutGroup>
+
+      <div className="dash__panel" role="tabpanel" id="dash-panel" aria-labelledby={`dash-tab-${tab}`}>
+        {tab === "ALL" ? (
+          <motion.div
+            key="all"
+            className="dash__overview"
+            initial={reduce ? false : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={springDefault}
+          >
+            <div className="dash__total">
+              <span className="dash__number">{formatNumber(total, lang)}</span>
+              <span className="muted">{t("landing.dash.total")}</span>
+            </div>
+            <div className="stack-bar" aria-hidden="true">
+              {statuses.map((s) => (
+                <motion.span
+                  key={s}
+                  className={`stack-bar__seg stack-bar__seg--${s}`}
+                  initial={reduce ? false : { width: 0 }}
+                  animate={{ width: `${share(counts[s])}%` }}
+                  transition={springDefault}
+                />
+              ))}
+            </div>
+            <ul className="dash__legend">
+              {statuses.map((s) => (
+                <li key={s}>
+                  <span className={`legend-dot legend-dot--${s}`} aria-hidden="true" />
+                  <span>{t(`status.${s}`)}</span>
+                  <strong className="mono">{formatNumber(counts[s], lang)}</strong>
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        ) : (
+          <motion.div
+            key={tab}
+            className="dash__status"
+            initial={reduce ? false : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={springDefault}
+          >
+            <div className="dash__total">
+              <span className="dash__number">{formatNumber(counts[tab], lang)}</span>
+              <span className={`chip chip--${tab} chip--lg`}>{t(`status.${tab}`)}</span>
+            </div>
+            <p className="body-l">{body[tab]}</p>
+            <div className="meter" aria-hidden="true">
+              <motion.span
+                className={`meter__fill stack-bar__seg--${tab}`}
+                initial={reduce ? false : { width: 0 }}
+                animate={{ width: `${share(counts[tab])}%` }}
+                transition={springDefault}
+              />
+            </div>
+            <span className="mono muted">{t("landing.dash.share", { percent: share(counts[tab]) })}</span>
+          </motion.div>
+        )}
+      </div>
     </>
   );
 }
@@ -307,19 +442,17 @@ export function HowItWorks() {
   return (
     <ol className="how">
       {steps.map(({ icon: Icon, title, body }, i) => (
-        <li key={title}>
-          <span className="icon-disc" style={{ "--size": "76px" } as React.CSSProperties}>
-            <Icon aria-hidden="true" />
-          </span>
-          <div className="how__text">
-            <span className="how__title">
-              <span className="how__num" aria-hidden="true">
-                {i + 1}
-              </span>
-              {title}
+        <li key={title} className="how__item">
+          <Reveal dir="up" delay={i * 0.1} className="how__card">
+            <span className="how__num" aria-hidden="true">
+              {String(i + 1).padStart(2, "0")}
             </span>
+            <span className="how__disc icon-disc" style={{ "--size": "56px" } as React.CSSProperties}>
+              <Icon aria-hidden="true" />
+            </span>
+            <span className="how__title">{title}</span>
             <span className="how__body">{body}</span>
-          </div>
+          </Reveal>
         </li>
       ))}
     </ol>

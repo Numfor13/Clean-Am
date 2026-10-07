@@ -60,6 +60,10 @@ export interface Report {
   flag_count?: number;
   created_at: string;
   updated_at?: string;
+  assigned_to?: string[];        // employee IDs the report is assigned to (Item 2)
+  assigned_names?: string[];     // their display names, for the staff/admin UI
+  assigned_at?: string;
+  assigned_to_me?: boolean;      // set by GET /reports/{id} for the signed-in employee
   status_history?: StatusHistoryEntry[];
   citizen?: {
     citizen_id: string;
@@ -114,6 +118,9 @@ export interface Employee {
   name: string;
   email: string;
   location: string;
+  zones?: string[];           // quarters this employee covers (Item 2)
+  base_lat?: number;
+  base_lng?: number;
   language: Lang;
   is_active: boolean;
   created_at: string;

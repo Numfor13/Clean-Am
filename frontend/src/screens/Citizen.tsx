@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiRequestError, authCall, getReportPage } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { formatCoords, formatMonthYear, formatPhone } from "@/lib/format";
@@ -82,7 +82,7 @@ export function SubmittedScreen() {
     return (
       <>
         <TopBar centerLogo />
-        <main id="main" className="m-screen m-screen--center stack center">
+        <main id="main" className="m-screen m-screen--narrow m-screen--center stack center">
           <EmptyState
             icon={<FileText aria-hidden="true" />}
             title={t("submitted.missingTitle")}
@@ -105,7 +105,7 @@ export function SubmittedScreen() {
   return (
     <>
       <TopBar centerLogo />
-      <main id="main" className="m-screen">
+      <main id="main" className="m-screen m-screen--narrow">
         <div className="stack" style={{ "--gap": "20px" } as React.CSSProperties}>
           <div className="confirm-head">
             <span className="icon-disc big-check">
@@ -133,8 +133,8 @@ export function SubmittedScreen() {
                   <StatusChip status={report.status} large />
                 </span>
               </div>
-              <div className="row" style={{ alignItems: "center", gap: 10, fontSize: 22, fontWeight: 700, color: "var(--brand-deep)", marginTop: 4 }}>
-                <span className="icon-disc" style={{ "--size": "34px", background: "#c9f7dd", color: "var(--brand-deep)" } as React.CSSProperties}>
+              <div className="row" style={{ alignItems: "center", gap: 10, fontSize: 18, fontWeight: 700, fontFamily: "var(--font-display)", color: "var(--md-primary-text)", marginTop: 4 }}>
+                <span className="icon-disc" style={{ "--size": "34px" } as React.CSSProperties}>
                   <Check strokeWidth={3} aria-hidden="true" style={{ width: 20, height: 20 }} />
                 </span>
                 <span>{t("submitted.sent")}</span>
@@ -241,11 +241,11 @@ export function MyReportsScreen() {
           {error ? <ErrorState message={error} onRetry={() => load(false)} /> : null}
 
           {reports === null ? (
-            <>
+            <div className="report-grid">
               <ReportCardSkeleton />
               <ReportCardSkeleton />
               <ReportCardSkeleton />
-            </>
+            </div>
           ) : reports.length === 0 && !error ? (
             filter === "ALL" ? (
               <EmptyState
@@ -263,7 +263,7 @@ export function MyReportsScreen() {
               <EmptyState icon={<FileText aria-hidden="true" />} title={t("myReports.emptyFiltered")} />
             )
           ) : (
-            <div className="stack" style={{ "--gap": "16px" } as React.CSSProperties}>
+            <div className="report-grid">
               {reports.map((r) => (
                 <ReportCard key={r.report_id} report={r} href={`/my-reports/${r.report_id}`} />
               ))}
@@ -341,7 +341,7 @@ export function CitizenReportScreen({ id }: { id: string }) {
             <Skeleton height={200} radius={12} />
           </div>
         ) : (
-          <div className="stack" style={{ "--gap": "16px" } as React.CSSProperties}>
+          <div className="stack citizen-detail" style={{ "--gap": "16px" } as React.CSSProperties}>
             <Photo src={report.photo_url} alt={title} className="photo photo--hero" />
             <div className="stack" style={{ "--gap": "10px" } as React.CSSProperties}>
               <h2 className="display-m" style={{ fontSize: 30 }}>
@@ -403,6 +403,10 @@ export function ProfileScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [emailOpen, setEmailOpen] = useState(false);
+  // The saved language is applied once, on the first load. Later reloads
+  // (after a language change, which re-creates `t`) must not undo a switch
+  // the person just made while the save is still in flight.
+  const langSynced = useRef(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -419,7 +423,10 @@ export function ProfileScreen() {
           )
           .catch(() => undefined);
       }
-      if (r.profile.language && r.profile.language !== lang) setLang(r.profile.language);
+      if (!langSynced.current) {
+        langSynced.current = true;
+        if (r.profile.language && r.profile.language !== lang) setLang(r.profile.language);
+      }
     } catch (err) {
       if (err instanceof ApiRequestError && err.status === 401) {
         window.location.assign("/login?next=/profile");
@@ -454,7 +461,7 @@ export function ProfileScreen() {
       <TopBar title={t("profile.title")} />
       <main id="main" className="m-screen m-screen--tabs">
         {error ? <ErrorState message={error} onRetry={load} /> : null}
-        <div className="stack" style={{ "--gap": "16px" } as React.CSSProperties}>
+        <div className="stack profile-grid" style={{ "--gap": "16px" } as React.CSSProperties}>
           <div className="card" style={{ padding: 20 }}>
             <div className="row" style={{ "--gap": "16px" } as React.CSSProperties}>
               <span className="avatar" style={{ "--size": "72px" } as React.CSSProperties}>
@@ -617,7 +624,7 @@ function AddEmailDialog({ open, initial, onClose, onDone }: { open: boolean; ini
       onDone();
     } catch (err) {
       const c = err instanceof ApiRequestError ? err.code : "";
-      setError(c === "WRONG_CODE" || c === "CODE_EXPIRED" ? t(`auth.error.${c}`) : t("auth.error.SERVICE_ERROR"));
+      setError(c === "WRONG_CODE" ? t("profile.wrongEmailCode") : c === "CODE_EXPIRED" ? t("auth.error.CODE_EXPIRED") : t("auth.error.SERVICE_ERROR"));
     } finally {
       setBusy(false);
     }

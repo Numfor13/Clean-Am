@@ -412,7 +412,7 @@ export function StaffReportListScreen() {
 
       {/* Mobile cards */}
       {!empty ? (
-        <div className="stack mobile-only" style={{ "--gap": "16px" } as React.CSSProperties}>
+        <div className="report-grid mobile-only">
           {everything.map((r) => (
             <ReportCard key={r.report_id} report={r} href={`/staff/reports/${r.report_id}`} showReporter />
           ))}
@@ -425,8 +425,8 @@ export function StaffReportListScreen() {
           {cursors[pages.length] && !loading ? (
             <button
               type="button"
-              className="btn btn--outline btn--block btn--lg"
-              style={{ background: "#f1fbf5", borderColor: "#bfe9d1" }}
+              className="btn btn--tonal btn--block btn--lg"
+              style={{ gridColumn: "1 / -1" }}
               onClick={() => fetchPage(pages.length, cursors[pages.length] ?? null)}
             >
               <Refresh aria-hidden="true" />
@@ -639,7 +639,11 @@ export function StaffReportScreen({ id }: { id: string }) {
   const lat = Number(report.latitude);
   const lng = Number(report.longitude);
 
-  const actionButtons = (
+  // Item 2 & 3: only the employee the report is assigned to can act on it.
+  // The admin is a distinct user and never acts on reports here.
+  const canAct = session.role === "Employee" && report.assigned_to_me === true;
+
+  const actionButtons = canAct ? (
     <>
       {target ? (
         <button type="button" className="btn btn--primary btn--lg grow" onClick={advance} disabled={busy}>
@@ -664,7 +668,9 @@ export function StaffReportScreen({ id }: { id: string }) {
         <span className="mobile-only">{t("staff.flag")}</span>
       </button>
     </>
-  );
+  ) : session.role === "Employee" ? (
+    <span className="help" style={{ padding: "8px 2px" }}>{t("staff.notAssignedToYou")}</span>
+  ) : null;
 
   const flagsTag =
     reporterFlags > 0 ? (
@@ -744,9 +750,11 @@ export function StaffReportScreen({ id }: { id: string }) {
 
         {/* Desktop right column */}
         <div className="stack desktop-only" style={{ "--gap": "20px", display: "flex" } as React.CSSProperties}>
-          <div className="row" style={{ "--gap": "12px" } as React.CSSProperties}>
-            {actionButtons}
-          </div>
+          {actionButtons ? (
+            <div className="row" style={{ "--gap": "12px" } as React.CSSProperties}>
+              {actionButtons}
+            </div>
+          ) : null}
           <div className="row-between" style={{ alignItems: "center" }}>
             <h1 className="display-m" style={{ fontSize: 34 }}>
               {title}
@@ -766,6 +774,12 @@ export function StaffReportScreen({ id }: { id: string }) {
                   {guest ? <span className="tag">{t("report.guestTag")}</span> : null}
                   {flagsTag}
                 </dd>
+                <span />
+              </div>
+              <div className="dl-row">
+                <ShieldCheck aria-hidden="true" />
+                <dt>{t("staff.assignedTo")}</dt>
+                <dd>{report.assigned_names?.length ? report.assigned_names.join(", ") : t("staff.unassigned")}</dd>
                 <span />
               </div>
               <div className="dl-row">
@@ -841,9 +855,11 @@ export function StaffReportScreen({ id }: { id: string }) {
       </div>
 
       {/* Mobile sticky actions */}
-      <div className="action-bar action-bar--bottom mobile-only">
-        <div className="action-bar__inner">{actionButtons}</div>
-      </div>
+      {actionButtons ? (
+        <div className="action-bar action-bar--bottom mobile-only">
+          <div className="action-bar__inner">{actionButtons}</div>
+        </div>
+      ) : null}
 
       <FlagDialog
         open={flagOpen}

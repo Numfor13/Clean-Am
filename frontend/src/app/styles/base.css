@@ -11,11 +11,11 @@ html {
 
 body {
   margin: 0;
-  background: var(--surface-page);
+  background: var(--md-surface);
   color: var(--ink);
   font-family: var(--font-text);
-  font-size: 15px;
-  line-height: 1.6;
+  font-size: 16px;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
 }
@@ -27,8 +27,8 @@ h4 {
   font-family: var(--font-display);
   color: var(--ink-strong);
   margin: 0;
-  line-height: 1.15;
-  letter-spacing: -0.01em;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
   text-wrap: balance;
 }
 
@@ -57,13 +57,18 @@ button {
   cursor: pointer;
 }
 
+::selection {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
+
 :focus-visible {
-  outline: 2px solid var(--focus-ring);
+  outline: 3px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
 .on-deep :focus-visible {
-  outline-color: var(--brand);
+  outline-color: var(--md-inverse-primary);
 }
 
 .sr-only {
@@ -94,51 +99,76 @@ button {
   top: var(--s2);
 }
 
+/* A new screen settles in. The wrapper only fades: a transform on it would
+   re-anchor the fixed navigation and action bars while it runs. The page's
+   own <main>, which never holds a fixed bar, rises on the default spring. */
+.page-enter {
+  animation: page-fade var(--md-dur-default) var(--md-spring-effects) backwards;
+}
+
+.page-enter > main {
+  animation: page-rise var(--md-dur-slow) var(--md-spring-default) backwards;
+}
+
+@keyframes page-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes page-rise {
+  from {
+    transform: translateY(16px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
 }
 
-/* ---- Type helpers ---- */
+/* ---- Type helpers (M3 scale, emphasised) ---- */
 .display-xl {
-  font-size: clamp(36px, 5vw, 56px);
-  line-height: 1.02;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-size: clamp(40px, 6vw, 64px);
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.035em;
 }
 
 .display-l {
-  font-size: clamp(30px, 4vw, 40px);
-  line-height: 1.1;
-  font-weight: 700;
-  letter-spacing: -0.015em;
+  font-size: clamp(32px, 4.4vw, 48px);
+  line-height: 1.05;
+  font-weight: 800;
+  letter-spacing: -0.03em;
 }
 
 .display-m {
-  font-size: clamp(26px, 3vw, 32px);
-  line-height: 1.15;
-  font-weight: 700;
+  font-size: clamp(28px, 3.2vw, 36px);
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -0.025em;
 }
 
 .heading-l {
   font-size: 24px;
-  line-height: 30px;
+  line-height: 32px;
   font-weight: 700;
 }
 
 .heading-m {
   font-size: 20px;
-  line-height: 26px;
+  line-height: 28px;
   font-weight: 700;
 }
 
 .heading-s {
   font-size: 17px;
-  line-height: 22px;
+  line-height: 24px;
   font-weight: 700;
 }
 
@@ -148,7 +178,7 @@ button {
 }
 
 .body-s {
-  font-size: 13px;
+  font-size: 14px;
   line-height: 20px;
 }
 
@@ -165,6 +195,16 @@ button {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-strong);
+}
+
+/* The reference's spaced, monospaced eyebrow: "LIVE_CITY_DASHBOARD" */
+.eyebrow-mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--md-primary-text);
 }
 
 .mono {
@@ -184,11 +224,15 @@ button {
 }
 
 .accent {
-  color: var(--brand);
+  color: var(--md-primary-display);
+}
+
+.on-deep .accent {
+  color: var(--md-inverse-primary);
 }
 
 .text-brand {
-  color: var(--brand-text);
+  color: var(--md-primary-display);
 }
 
 .text-danger {
@@ -249,4 +293,10 @@ button {
   .container {
     padding: 0 var(--s8);
   }
+}
+
+/* Above-the-fold entrance that needs no JavaScript: plays on first paint. */
+.enter {
+  animation: rise-in var(--md-dur-slow) var(--md-spring-default) backwards;
+  animation-delay: var(--d, 0ms);
 }

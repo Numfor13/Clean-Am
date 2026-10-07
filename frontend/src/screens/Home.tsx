@@ -12,6 +12,7 @@ import { LangSwitch } from "@/components/forms";
 import { TabBar, TopBar, useSignOut } from "@/components/shell";
 import { ReportCard } from "@/components/reports";
 import { InstallCard } from "@/components/pwa";
+import { Reveal } from "@/components/Reveal";
 import { Camera, ChevronRight, Headphones, FileText, Recycle, ShieldAlert, Trash, Truck, UserRound } from "@/components/icons";
 import { site } from "@/lib/site";
 import { HowItWorks, usePublicStats } from "./Landing";
@@ -44,7 +45,7 @@ export function HomeScreen({ mode }: { mode: "guest" | "citizen" }) {
         <section className="home-hero on-deep" id="top">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/images/guest-hero.jpg" alt="" />
-          <div className="home-hero__copy">
+          <div className="home-hero__copy enter" style={{ "--d": "120ms" } as React.CSSProperties}>
             <h1 className="home-hero__title">
               {t("home.title1")}
               <br />
@@ -113,22 +114,23 @@ export function HomeScreen({ mode }: { mode: "guest" | "citizen" }) {
           <InstallCard />
 
           <section className="stack" style={{ "--gap": "16px" } as React.CSSProperties} id="how" aria-labelledby="how-title">
-            <div>
+            <Reveal dir="up">
               <h2 id="how-title" className="display-m" style={{ fontSize: 30 }}>
                 {t("how.title")}
               </h2>
               <p className="body-l">{t("how.lead")}</p>
-            </div>
+            </Reveal>
             <HowItWorks />
           </section>
 
           <section className="stack" style={{ "--gap": "12px" } as React.CSSProperties} id="services" aria-labelledby="svc-title">
-            <div>
+            <Reveal dir="up">
               <h2 id="svc-title" className="display-m" style={{ fontSize: 30 }}>
                 {t("home.servicesTitle")}
               </h2>
               <p className="body-l">{t("home.servicesLead")}</p>
-            </div>
+            </Reveal>
+            <div className="service-grid">
             {services.map(({ icon: Icon, title, body, href, soon }) =>
               soon ? (
                 <div className="service-card is-soon" key={title}>
@@ -154,6 +156,7 @@ export function HomeScreen({ mode }: { mode: "guest" | "citizen" }) {
                 </Link>
               ),
             )}
+            </div>
           </section>
         </div>
       </main>
@@ -169,7 +172,7 @@ export function SuspendedScreen({ guest, guestLabel }: { guest: boolean; guestLa
   return (
     <>
       <TopBar centerLogo />
-      <main id="main" className="m-screen" style={{ paddingTop: 40 }}>
+      <main id="main" className="m-screen m-screen--narrow" style={{ paddingTop: 40 }}>
         <div className="stack" style={{ "--gap": "24px" } as React.CSSProperties}>
           <div className="stack center" style={{ "--gap": "16px" } as React.CSSProperties}>
             <span className="icon-disc icon-disc--danger hero-disc" style={{ "--size": "140px" } as React.CSSProperties}>

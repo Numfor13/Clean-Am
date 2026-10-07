@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { authCall } from "@/lib/api";
+import { api, authCall } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { initials } from "@/lib/format";
-import type { Role } from "@/lib/types";
+import type { ReportPage, Role } from "@/lib/types";
 import {
   ArrowLeft,
   Camera,
@@ -54,7 +54,7 @@ export function TopBar({
   const router = useRouter();
   const { t } = useT();
   return (
-    <header className={`topbar on-deep${wide ? " topbar--wide" : ""}`}>
+    <header className={`topbar${wide ? " topbar--wide" : ""}`}>
       <div className="topbar__inner" style={centerLogo ? { justifyContent: "center" } : undefined}>
         {back ? (
           typeof back === "string" ? (
@@ -94,13 +94,9 @@ export function TabBar() {
           const current = pathname === href || pathname.startsWith(`${href}/`);
           return (
             <Link key={href} href={href} prefetch={true} className="tab" aria-current={current ? "page" : undefined}>
-              {current ? (
-                <span className="tab__raise">
-                  <Icon aria-hidden="true" />
-                </span>
-              ) : (
+              <span className="tab__icon">
                 <Icon aria-hidden="true" />
-              )}
+              </span>
               <span>{label}</span>
             </Link>
           );
@@ -137,7 +133,10 @@ export function Dialog({
       Array.from(
         node?.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])') ?? [],
       ).filter((el) => !el.hasAttribute("disabled"));
-    focusable()[0]?.focus();
+    // Start in the first field (or the first control that is not the close
+    // button), so typing can begin straight away.
+    const items = focusable();
+    (node?.querySelector<HTMLElement>("input, select, textarea") ?? items.find((el) => !el.classList.contains("dialog__close")) ?? items[0])?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
       if (e.key === "Tab") {
@@ -283,14 +282,33 @@ export function StaffShell({
 
   useEffect(() => setDrawerOpen(false), [pathname]);
 
+  // Item 4: badge the admin's Unassigned tab with how many reports no employee
+  // covers. Re-checked whenever the admin moves between pages.
+  const [unassigned, setUnassigned] = useState(0);
+  useEffect(() => {
+    if (role !== "Admin") return;
+    let alive = true;
+    api
+      .get<ReportPage>("reports/unassigned?limit=100")
+      .then((r) => {
+        if (alive) setUnassigned(r.has_more ? 100 : r.reports.length);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [role, pathname]);
+
+  // Item 3: the admin is a distinct user — Employees, the Unassigned queue and
+  // Flagged citizens only. No "Reports" tab (that is the employees' screen).
   const links =
     role === "Admin"
       ? [
-          { href: "/admin/employees", label: t("nav.employees"), icon: Users },
-          { href: "/admin/flagged", label: t("nav.flaggedCitizens"), icon: Flag },
-          { href: "/staff/reports", label: t("nav.reports"), icon: ClipboardList },
+          { href: "/admin/employees", label: t("nav.employees"), icon: Users, badge: 0 },
+          { href: "/admin/unassigned", label: t("nav.unassigned"), icon: ClipboardList, badge: unassigned },
+          { href: "/admin/flagged", label: t("nav.flaggedCitizens"), icon: Flag, badge: 0 },
         ]
-      : [{ href: "/staff/reports", label: t("nav.reports"), icon: ClipboardList }];
+      : [{ href: "/staff/reports", label: t("nav.reports"), icon: ClipboardList, badge: 0 }];
 
   const isCurrent = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   // A report's own screen brings its own phone top bar (back + reference).
@@ -301,13 +319,19 @@ export function StaffShell({
 
   return (
     <>
-      <header className="staff-header on-deep desktop-only">
+      <header className="staff-header desktop-only">
         <div className="staff-header__inner">
           <Logo sub={t("nav.councilWorkspace")} href={links[0].href} />
           <nav className="staff-nav" aria-label={t("nav.workspace")}>
-            {links.map((l) => (
-              <Link key={l.href} href={l.href} aria-current={isCurrent(l.href) ? "page" : undefined}>
-                {l.label}
+            {links.map(({ href, label, icon: Icon, badge }) => (
+              <Link key={href} href={href} aria-current={isCurrent(href) ? "page" : undefined}>
+                <Icon aria-hidden="true" />
+                {label}
+                {badge > 0 ? (
+                  <span className="nav-badge" aria-hidden="true">
+                    {badge > 99 ? "99+" : badge}
+                  </span>
+                ) : null}
               </Link>
             ))}
           </nav>
@@ -350,7 +374,7 @@ export function StaffShell({
       </header>
 
       {ownMobileBar ? null : (
-      <header className="topbar on-deep mobile-only">
+      <header className="topbar mobile-only">
         <div className="topbar__inner" style={{ maxWidth: "none" }}>
           <Logo size={34} href={links[0].href} />
           <div className="topbar__end">
@@ -368,19 +392,27 @@ export function StaffShell({
 
       {drawerOpen ? (
         <div className="drawer" onMouseDown={(e) => e.target === e.currentTarget && setDrawerOpen(false)}>
-          <div className="drawer__panel on-deep" role="dialog" aria-modal="true" aria-label={t("nav.menu")}>
-            <div className="row-between" style={{ marginBottom: 8 }}>
-              <span className="strong" style={{ color: "#fff" }}>
-                {name}
+          <div className="drawer__panel" role="dialog" aria-modal="true" aria-label={t("nav.menu")}>
+            <div className="drawer__head">
+              <span className="row" style={{ "--gap": "10px" } as React.CSSProperties}>
+                <span className="avatar" style={{ "--size": "36px" } as React.CSSProperties}>
+                  {initials(name)}
+                </span>
+                <span className="strong">{name}</span>
               </span>
               <button type="button" className="icon-btn" aria-label={t("common.close")} onClick={() => setDrawerOpen(false)}>
                 <Close aria-hidden="true" />
               </button>
             </div>
-            {links.map(({ href, label, icon: Icon }) => (
+            {links.map(({ href, label, icon: Icon, badge }) => (
               <Link key={href} href={href} aria-current={isCurrent(href) ? "page" : undefined}>
                 <Icon aria-hidden="true" />
                 {label}
+                {badge > 0 ? (
+                  <span className="nav-badge" aria-hidden="true" style={{ marginLeft: "auto" }}>
+                    {badge > 99 ? "99+" : badge}
+                  </span>
+                ) : null}
               </Link>
             ))}
             <Link href="/staff/security" aria-current={isCurrent("/staff/security") ? "page" : undefined}>
@@ -393,7 +425,7 @@ export function StaffShell({
                 {t("install.cta")}
               </button>
             ) : null}
-            <div className="drawer__item" style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px" }}>
+            <div className="drawer__item">
               <Globe aria-hidden="true" />
               <LangSwitch />
             </div>

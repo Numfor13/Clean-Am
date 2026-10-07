@@ -483,7 +483,7 @@ export function VerifyScreen({ purpose, destination }: { purpose: "signup" | "si
     return (
       <>
         <TopBar back="/login" logo />
-        <main id="main" className="m-screen m-screen--center stack center">
+        <main id="main" className="m-screen m-screen--narrow m-screen--center stack center">
           <span className="icon-disc hero-disc">
             <Warning aria-hidden="true" />
           </span>
@@ -504,9 +504,9 @@ export function VerifyScreen({ purpose, destination }: { purpose: "signup" | "si
   return (
     <>
       <TopBar back={purpose === "signup" ? "/register" : "/login"} logo />
-      <main id="main" className="m-screen m-screen--center">
+      <main id="main" className="m-screen m-screen--narrow m-screen--center">
         <form className="stack center" style={{ "--gap": "24px" } as React.CSSProperties} onSubmit={submit} noValidate>
-          <span className="icon-disc hero-disc" style={{ background: "#c9f7dd" }}>
+          <span className="icon-disc hero-disc">
             {app ? <ShieldCheck aria-hidden="true" /> : <Smartphone aria-hidden="true" />}
           </span>
           <div className="stack" style={{ "--gap": "8px" } as React.CSSProperties}>
@@ -584,10 +584,10 @@ export function ForgotScreen({ staff: staffAtStart = false }: { staff?: boolean 
   return (
     <>
       <TopBar back="/login" logo />
-      <main id="main" className="m-screen m-screen--center">
+      <main id="main" className="m-screen m-screen--narrow m-screen--center">
         <form className="stack" style={{ "--gap": "24px" } as React.CSSProperties} onSubmit={submit} noValidate>
           <div className="stack center" style={{ "--gap": "12px" } as React.CSSProperties}>
-            <span className="icon-disc hero-disc" style={{ background: "#c9f7dd" }}>
+            <span className="icon-disc hero-disc">
               <Lock aria-hidden="true" />
             </span>
             <h1 className="display-m" style={{ fontSize: 34 }}>
@@ -680,10 +680,10 @@ export function ResetScreen({ destination }: { destination: string | null }) {
   return (
     <>
       <TopBar back="/forgot-password" logo />
-      <main id="main" className="m-screen m-screen--center" style={{ paddingTop: 32 }}>
+      <main id="main" className="m-screen m-screen--narrow m-screen--center" style={{ paddingTop: 32 }}>
         <form className="stack" style={{ "--gap": "22px" } as React.CSSProperties} onSubmit={submit} noValidate>
           <div className="stack center" style={{ "--gap": "12px" } as React.CSSProperties}>
-            <span className="icon-disc hero-disc" style={{ background: "#c9f7dd" }}>
+            <span className="icon-disc hero-disc">
               <Lock aria-hidden="true" />
             </span>
             <h1 className="display-m" style={{ fontSize: 34 }}>
@@ -746,7 +746,7 @@ export function FirstSignInScreen({ email }: { email: string | null }) {
   return (
     <>
       <TopBar logo end={<span className="staff-pill staff-pill--mint">{t("nav.staff")}</span>} />
-      <main id="main" className="m-screen" style={{ paddingTop: 32 }}>
+      <main id="main" className="m-screen m-screen--narrow" style={{ paddingTop: 32 }}>
         {email === null ? (
           <div className="stack center" style={{ "--gap": "16px" } as React.CSSProperties}>
             <h1 className="display-m">{t("verify.expiredTitle")}</h1>
@@ -758,7 +758,7 @@ export function FirstSignInScreen({ email }: { email: string | null }) {
         ) : (
           <form className="stack" style={{ "--gap": "22px" } as React.CSSProperties} onSubmit={submit} noValidate>
             <div className="stack center" style={{ "--gap": "12px" } as React.CSSProperties}>
-              <span className="icon-disc hero-disc" style={{ background: "#c9f7dd" }}>
+              <span className="icon-disc hero-disc">
                 <Lock aria-hidden="true" />
               </span>
               <h1 className="display-m" style={{ fontSize: 34 }}>

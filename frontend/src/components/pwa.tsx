@@ -141,7 +141,7 @@ export function InstallCard() {
 export function OfflineScreen() {
   const { t } = useT();
   return (
-    <main id="main" className="m-screen m-screen--center stack center" style={{ "--gap": "20px" } as React.CSSProperties}>
+    <main id="main" className="m-screen m-screen--narrow m-screen--center stack center" style={{ "--gap": "20px" } as React.CSSProperties}>
       <span className="icon-disc hero-disc">
         <WifiOff aria-hidden="true" />
       </span>

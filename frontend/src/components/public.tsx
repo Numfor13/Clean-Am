@@ -7,7 +7,7 @@ import { useT } from "@/lib/i18n";
 import { site } from "@/lib/site";
 import { useSession } from "./Providers";
 import { LangSwitch } from "./forms";
-import { ArrowLeft, ArrowRight, Close, Facebook, Instagram, Mail, MapPin, Menu, Phone, XTwitter, Youtube, ChevronDown } from "./icons";
+import { ArrowLeft, ArrowRight, Camera, Close, Facebook, Instagram, Mail, MapPin, Menu, Phone, XTwitter, Youtube, ChevronDown } from "./icons";
 import { Logo } from "./ui";
 import { homeFor } from "@/lib/jwt";
 
@@ -43,7 +43,7 @@ export function PublicHeader({ minimal }: { minimal?: boolean }) {
       ];
 
   return (
-    <header className="public-header on-deep">
+    <header className="public-header">
       <div className="public-header__inner">
         {isAccountArea ? (
           <Link
@@ -51,9 +51,8 @@ export function PublicHeader({ minimal }: { minimal?: boolean }) {
             className="icon-btn topbar__back"
             aria-label={t("common.back") || "Back to landing page"}
             title="Back to landing page"
-            style={{ marginRight: 6 }}
           >
-            <ArrowLeft aria-hidden="true" style={{ width: 22, height: 22 }} />
+            <ArrowLeft aria-hidden="true" />
           </Link>
         ) : null}
         <Logo sub={t("brand.sub")} href={isAccountArea ? "/home" : "/"} />
@@ -93,8 +92,8 @@ export function PublicHeader({ minimal }: { minimal?: boolean }) {
 
       {open ? (
         <div className="drawer" onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)}>
-          <div className="drawer__panel on-deep" role="dialog" aria-modal="true" aria-label={t("nav.menu")}>
-            <div className="row-between" style={{ marginBottom: 8 }}>
+          <div className="drawer__panel" role="dialog" aria-modal="true" aria-label={t("nav.menu")}>
+            <div className="drawer__head">
               <LangSwitch />
               <button type="button" className="icon-btn" aria-label={t("common.close")} onClick={() => setOpen(false)} autoFocus>
                 <Close aria-hidden="true" />
@@ -116,7 +115,8 @@ export function PublicHeader({ minimal }: { minimal?: boolean }) {
                 </Link>
               )
             ) : null}
-            <Link href="/report" className="btn btn--primary" style={{ marginTop: 16 }} onClick={() => setOpen(false)}>
+            <Link href="/report" className="btn btn--primary btn--lg" style={{ marginTop: "auto" }} onClick={() => setOpen(false)}>
+              <Camera aria-hidden="true" />
               {t("nav.submitReport")}
             </Link>
           </div>

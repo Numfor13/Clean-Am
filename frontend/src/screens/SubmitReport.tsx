@@ -22,6 +22,11 @@ import { FieldError } from "@/components/ui";
 const MAX_EDGE = 1600;
 const MAX_BYTES = 10 * 1024 * 1024;
 const OTHER = "__other__";
+// GPS: the first fix is often a stale/coarse network estimate. We keep the most
+// accurate reading that arrives within a short window instead of trusting the first.
+const GOOD_ACCURACY_M = 35; // a fix this tight is trustworthy — stop early
+const COARSE_ACCURACY_M = 100; // beyond this, warn and suggest dragging the pin
+const LOCATE_WINDOW_MS = 12000; // keep improving the fix for up to this long
 
 interface PreparedPhoto {
   blob: Blob;
@@ -81,6 +86,7 @@ export function SubmitReportScreen() {
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [location, setLocation] = useState<LatLng | null>(null);
   const [locState, setLocState] = useState<LocState>("locating");
+  const [accuracy, setAccuracy] = useState<number | null>(null);
   const [city, setCity] = useState(DEFAULT_CITY);
   const [quarter, setQuarter] = useState("");
   const [customQuarter, setCustomQuarter] = useState("");
@@ -96,6 +102,8 @@ export function SubmitReportScreen() {
   const [guestLabel, setGuestLabel] = useState(session.guestLabel);
   const uploaded = useRef<{ blob: Blob; key: string } | null>(null);
   const abortUpload = useRef<(() => void) | null>(null);
+  const watchId = useRef<number | null>(null);
+  const watchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ---- connection ----------------------------------------------------------
   useEffect(() => {
@@ -129,7 +137,8 @@ export function SubmitReportScreen() {
   }, []);
 
   const applyPoint = useCallback(
-    (point: LatLng, source: "gps" | "manual") => {
+    (point: LatLng, source: "gps" | "manual", acc?: number) => {
+      setAccuracy(source === "manual" ? null : acc ?? null);
       if (!isInCameroon(point.lat, point.lng)) {
         setLocation(point);
         setLocState("outside");
@@ -171,6 +180,17 @@ export function SubmitReportScreen() {
     [placeTouched, reverseGeocode],
   );
 
+  const stopWatch = useCallback(() => {
+    if (watchId.current !== null) {
+      navigator.geolocation.clearWatch(watchId.current);
+      watchId.current = null;
+    }
+    if (watchTimer.current !== null) {
+      clearTimeout(watchTimer.current);
+      watchTimer.current = null;
+    }
+  }, []);
+
   const locate = useCallback(() => {
     if (typeof window !== "undefined" && !window.isSecureContext && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
       setLocState("unavailable");
@@ -180,26 +200,43 @@ export function SubmitReportScreen() {
       setLocState("unavailable");
       return;
     }
+    stopWatch();
     setLocState("locating");
     setErrors((e) => ({ ...e, location: "" }));
-    navigator.geolocation.getCurrentPosition(
-      (pos) => applyPoint({ lat: pos.coords.latitude, lng: pos.coords.longitude }, "gps"),
+
+    // Watch rather than read once: the first fix is frequently a stale or coarse
+    // network estimate (the old bug). Keep the most accurate fix that arrives,
+    // and stop as soon as it is tight enough or the window closes — with
+    // maximumAge: 0 so a cached location is never reused.
+    let best: { lat: number; lng: number; acc: number } | null = null;
+    const finish = () => {
+      stopWatch();
+      if (best) {
+        applyPoint({ lat: best.lat, lng: best.lng }, "gps", best.acc);
+      } else {
+        setLocState((s) => (s === "locating" ? "unavailable" : s));
+      }
+    };
+
+    watchId.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        const acc = pos.coords.accuracy ?? Number.POSITIVE_INFINITY;
+        if (!best || acc < best.acc) {
+          best = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc };
+        }
+        if (best.acc <= GOOD_ACCURACY_M) finish(); // good enough — don't keep the user waiting
+      },
       (err) => {
         if (err.code === err.PERMISSION_DENIED) {
+          stopWatch();
           setLocState("denied");
-        } else {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => applyPoint({ lat: pos.coords.latitude, lng: pos.coords.longitude }, "gps"),
-            (fallbackErr) => {
-              setLocState(fallbackErr.code === fallbackErr.PERMISSION_DENIED ? "denied" : "unavailable");
-            },
-            { enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 },
-          );
         }
+        // Any other error: keep watching until the timeout; finish() decides.
       },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 15000 },
+      { enableHighAccuracy: true, timeout: LOCATE_WINDOW_MS, maximumAge: 0 },
     );
-  }, [applyPoint]);
+    watchTimer.current = setTimeout(finish, LOCATE_WINDOW_MS);
+  }, [applyPoint, stopWatch]);
 
   useEffect(() => {
     locate();
@@ -208,6 +245,7 @@ export function SubmitReportScreen() {
   }, []);
 
   useEffect(() => () => abortUpload.current?.(), []);
+  useEffect(() => () => stopWatch(), [stopWatch]);
 
   // ---- photo -----------------------------------------------------------------
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -359,7 +397,7 @@ export function SubmitReportScreen() {
     <>
       <TopBar title={t("submit.title")} back={isGuest ? "/guest" : "/home"} />
       <main id="main" className={`m-screen ${isGuest ? "" : "m-screen--tabs-cta"}`} style={isGuest ? { paddingBottom: 120 } : undefined}>
-        <div className="stack" style={{ "--gap": "16px" } as React.CSSProperties}>
+        <div className="stack report-steps" style={{ "--gap": "16px" } as React.CSSProperties}>
           {isGuest ? (
             <div className="banner banner--info" style={{ alignItems: "center" }}>
               <UserRound aria-hidden="true" />
@@ -455,6 +493,13 @@ export function SubmitReportScreen() {
                     {t("submit.retryLocation")}
                   </button>
                 </div>
+              </div>
+            ) : null}
+
+            {locState === "found" && accuracy !== null && accuracy > COARSE_ACCURACY_M ? (
+              <div className="banner banner--warning" role="status" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Warning aria-hidden="true" />
+                <span>{t("submit.locationApprox", { m: Math.round(accuracy) })}</span>
               </div>
             ) : null}
 

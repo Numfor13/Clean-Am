@@ -11,12 +11,14 @@ import { AlertCircle, ImageOff } from "./icons";
 export function Logo({ sub, href = "/", size = 38 }: { sub?: string | null; href?: string | null; size?: number }) {
   const mark = (
     <>
-      <svg viewBox="0 0 48 48" width={size} height={size} aria-hidden="true" style={{ width: size, height: size }}>
-        <path
-          d="M42 6C24 6 8 14 8 31c0 4 1.3 7.4 3.4 10.1C14 32 20 25 29 20c-7 6.3-12 13.4-14.7 23.2C17.2 44.4 20.4 45 24 45 37 45 43 32 43 18c0-4-.3-8.4-1-12Z"
-          fill="#48f596"
-        />
-      </svg>
+      <span className="logo__mark" style={{ "--logo-size": `${size}px` } as React.CSSProperties} aria-hidden="true">
+        <svg viewBox="0 0 48 48">
+          <path
+            d="M42 6C24 6 8 14 8 31c0 4 1.3 7.4 3.4 10.1C14 32 20 25 29 20c-7 6.3-12 13.4-14.7 23.2C17.2 44.4 20.4 45 24 45 37 45 43 32 43 18c0-4-.3-8.4-1-12Z"
+            fill="currentColor"
+          />
+        </svg>
+      </span>
       <span className="logo__name">
         <span className="logo__word">CLEAN-AM</span>
         {sub ? <span className="logo__sub">{sub}</span> : null}
