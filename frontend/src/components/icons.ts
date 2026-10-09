@@ -45,6 +45,7 @@ export {
   LuMessageCircleMore as MessageDots,
   LuMessageSquareText as MessageText,
   LuPhone as Phone,
+  LuPencil as Pencil,
   LuPlay as Play,
   LuQuote as Quote,
   LuRecycle as Recycle,
@@ -71,6 +72,14 @@ export {
   LuZap as Zap,
   LuCalendarDays as CalendarDays,
   LuClipboardList as ClipboardList,
+  LuChartColumn as BarChart3,
+  LuTrendingUp as TrendingUp,
+  LuActivity as Activity,
+  LuTimer as Timer,
+  LuChartPie as PieChart,
+  LuBriefcase as Briefcase,
+  LuCheckCheck as CheckCheck,
+  LuSparkles as Sparkles,
 } from "react-icons/lu";
 
 export { FaFacebookF as Facebook, FaInstagram as Instagram, FaXTwitter as XTwitter, FaYoutube as Youtube } from "react-icons/fa6";

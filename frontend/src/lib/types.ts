@@ -125,6 +125,8 @@ export interface Employee {
   is_active: boolean;
   created_at: string;
   created_by_username?: string;
+  updated_at?: string;
+  updated_by?: string;
   reports_resolved?: number;
 }
 

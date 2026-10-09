@@ -25,6 +25,7 @@ import {
   User,
   Users,
   AlertCircle,
+  BarChart3,
 } from "./icons";
 import { LangSwitch } from "./forms";
 import { useInstall } from "./pwa";
@@ -305,6 +306,7 @@ export function StaffShell({
     role === "Admin"
       ? [
           { href: "/admin/employees", label: t("nav.employees"), icon: Users, badge: 0 },
+          { href: "/admin/stats", label: t("nav.stats"), icon: BarChart3, badge: 0 },
           { href: "/admin/unassigned", label: t("nav.unassigned"), icon: ClipboardList, badge: unassigned },
           { href: "/admin/flagged", label: t("nav.flaggedCitizens"), icon: Flag, badge: 0 },
         ]

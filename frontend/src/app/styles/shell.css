@@ -926,13 +926,13 @@ a.logo:hover .logo__mark {
     bottom: 0;
     width: 104px;
     display: flex;
-    align-items: center;
-    padding: var(--s3);
+    align-items: flex-start;
+    padding: var(--s5) var(--s3);
   }
 
   .tabbar__inner {
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
     gap: var(--s4);
     width: 80px;
     max-width: none;

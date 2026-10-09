@@ -97,7 +97,8 @@ class ApiStack(Stack):
         # Specific IAM permissions for each pool
         employee_admin.add_to_role_policy(iam.PolicyStatement(
             actions=["cognito-idp:AdminCreateUser", "cognito-idp:AdminAddUserToGroup",
-                     "cognito-idp:AdminDeleteUser", "cognito-idp:AdminDisableUser"],
+                     "cognito-idp:AdminDeleteUser", "cognito-idp:AdminDisableUser",
+                     "cognito-idp:AdminUpdateUserAttributes", "cognito-idp:AdminEnableUser"],
             resources=[employee_pool.user_pool_arn]))
 
         flag.add_to_role_policy(iam.PolicyStatement(
@@ -160,6 +161,7 @@ class ApiStack(Stack):
             ("POST", "employees", employee_admin, signed_in),
             ("GET", "employees", employee_admin, signed_in),
             ("GET", "employees/{employee_id}", employee_admin, signed_in),
+            ("PATCH", "employees/{employee_id}", employee_admin, signed_in),
             ("DELETE", "employees/{employee_id}", employee_admin, signed_in),
             ("GET", "citizens/flagged", flag, signed_in),
             ("GET", "citizens/{citizen_id}", flag, signed_in),

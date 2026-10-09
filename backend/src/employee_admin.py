@@ -2,6 +2,7 @@
 POST   /employees                  admin creates a staff account; Cognito emails the invitation
 GET    /employees                  admin lists staff accounts
 GET    /employees/{employee_id}
+PATCH  /employees/{employee_id}    admin updates employee details
 DELETE /employees/{employee_id}    revoke access (deactivate, never delete: reports refer to them)
 """
 import os
@@ -15,7 +16,7 @@ from botocore.exceptions import ClientError
 
 from assignment import active_employees, choose_assignees, pending_unassigned_in
 from common import (IN_PROGRESS, PENDING, ApiError, Key, api, body, caller, client, conditional_failed, decode_cursor,
-                    encode_cursor, logger, now, page_size, path_param, plain, query, respond, table, text)
+                    encode_cursor, is_true, logger, now, page_size, path_param, plain, query, respond, table, text)
 
 EMAIL_PATTERN = r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$"
 # Symbols that read clearly in an email and need no escaping in HTML.
@@ -186,6 +187,127 @@ def revoke(who, employee_id: str):
     return respond(200, {"employee": plain(result["Attributes"])})
 
 
+def update(event, who, employee_id: str):
+    employee = get_employee(employee_id)
+    data = body(event)
+    updates = {}
+    removes = []
+    cognito_attrs = []
+
+    if "name" in data:
+        name = text(data["name"], "name", 100)
+        updates["name"] = name
+        cognito_attrs.append({"Name": "name", "Value": name})
+
+    if "email" in data:
+        email = text(data["email"], "email", 254).lower()
+        if not re.match(EMAIL_PATTERN, email):
+            raise ApiError(400, "INVALID_EMAIL", "Enter a valid email address.", {"field": "email"})
+        if email != employee.get("email"):
+            existing = table("employees").query(
+                IndexName="GSI-email",
+                KeyConditionExpression=Key("email").eq(email),
+                Limit=1
+            )["Items"]
+            if existing and existing[0]["employee_id"] != employee_id:
+                raise ApiError(409, "EMAIL_EXISTS", "An account with that email address already exists.")
+            updates["email"] = email
+            cognito_attrs.append({"Name": "email", "Value": email})
+            cognito_attrs.append({"Name": "email_verified", "Value": "true"})
+
+    zones_changed = False
+    if "zones" in data:
+        zones = parse_zones(data)
+        updates["zones"] = zones
+        zones_changed = True
+        base_lat, base_lng = parse_base(data)
+        if base_lat is not None and base_lng is not None:
+            updates["base_lat"], updates["base_lng"] = base_lat, base_lng
+        elif "base_lat" in data and data["base_lat"] in (None, ""):
+            removes.extend(["base_lat", "base_lng"])
+        location = text(data.get("location"), "location", 100, required=False) or ", ".join(zones)
+        updates["location"] = location
+    elif "location" in data:
+        updates["location"] = text(data["location"], "location", 100, required=False) or employee.get("location")
+
+    if "language" in data:
+        language = "fr" if data["language"] == "fr" else "en"
+        updates["language"] = language
+        cognito_attrs.append({"Name": "custom:language", "Value": language})
+
+    reactivating = False
+    deactivating = False
+    if "is_active" in data:
+        new_active = is_true(data["is_active"])
+        old_active = is_true(employee.get("is_active"))
+        if new_active != old_active:
+            updates["is_active"] = new_active
+            if new_active:
+                reactivating = True
+                updates["reactivated_at"] = now()
+                updates["reactivated_by"] = who.id
+            else:
+                deactivating = True
+                updates["deactivated_at"] = now()
+                updates["deactivated_by"] = who.id
+
+    if not updates and not removes:
+        raise ApiError(400, "NO_UPDATES", "Nothing to update.")
+
+    updates["updated_at"] = now()
+    updates["updated_by"] = who.id
+
+    pool = os.environ.get("EMPLOYEE_USER_POOL_ID", os.environ.get("USER_POOL_ID", ""))
+    cognito_username = employee.get("cognito_username")
+
+    if cognito_attrs and cognito_username:
+        try:
+            client("cognito-idp").admin_update_user_attributes(
+                UserPoolId=pool,
+                Username=cognito_username,
+                UserAttributes=cognito_attrs
+            )
+        except ClientError as exc:
+            code = exc.response["Error"]["Code"]
+            if code in ("AliasExistsException", "UsernameExistsException"):
+                raise ApiError(409, "EMAIL_EXISTS", "An account with that email address already exists.")
+            raise cognito_failure("update the account attributes", exc)
+
+    if reactivating and cognito_username:
+        try:
+            client("cognito-idp").admin_enable_user(UserPoolId=pool, Username=cognito_username)
+        except ClientError:
+            logger.exception("could not enable %s in Cognito", employee_id)
+    elif deactivating and cognito_username:
+        try:
+            client("cognito-idp").admin_disable_user(UserPoolId=pool, Username=cognito_username)
+        except ClientError:
+            logger.exception("could not disable %s in Cognito", employee_id)
+
+    set_clauses = [f"#{k} = :{k}" for k in updates]
+    expr_names = {f"#{k}": k for k in updates}
+    expr_values = {f":{k}": v for k, v in updates.items()}
+    update_expr = "SET " + ", ".join(set_clauses)
+    if removes:
+        remove_clauses = [f"#{k}" for k in removes]
+        expr_names.update({f"#{k}": k for k in removes})
+        update_expr += " REMOVE " + ", ".join(remove_clauses)
+
+    result = table("employees").update_item(
+        Key={"employee_id": employee_id},
+        UpdateExpression=update_expr,
+        ExpressionAttributeNames=expr_names,
+        ExpressionAttributeValues=expr_values,
+        ReturnValues="ALL_NEW"
+    )
+    updated_employee = result["Attributes"]
+
+    if updated_employee.get("is_active") and (zones_changed or reactivating):
+        drain_pending(updated_employee)
+
+    return respond(200, {"employee": plain(updated_employee)})
+
+
 @api
 def handler(event, context):
     who = caller(event, "Admin")
@@ -194,6 +316,8 @@ def handler(event, context):
         return create(event, who)
     if method == "DELETE":
         return revoke(who, employee_id)
+    if method == "PATCH" and employee_id:
+        return update(event, who, employee_id)
     if employee_id:
         return respond(200, {"employee": plain(get_employee(employee_id))})
     return list_employees(event)

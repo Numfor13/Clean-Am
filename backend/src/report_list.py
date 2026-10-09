@@ -61,10 +61,11 @@ def my_reports(event):
 
 
 def all_reports(event):
-    caller(event, "Employee")
+    caller(event, "Employee", "Admin")
     params = query(event)
     status = status_value(params["status"]) if params.get("status") else None
     quarter = text(params.get("quarter"), "quarter", 80, required=False)
+    assigned_to = text(params.get("assigned_to"), "assigned_to", 100, required=False)
     reports = table("reports")
     kwargs = {"Limit": page_size(params)}
 
@@ -92,6 +93,8 @@ def all_reports(event):
         filters.append(Attr("is_fraudulent").eq(False))
     if params.get("search"):
         filters.append(Attr("search_text").contains(text(params["search"], "search", 100).lower()))
+    if assigned_to:
+        filters.append(Attr("assigned_to").contains(assigned_to))
     if filters:
         combined = filters[0]
         for extra in filters[1:]:
